@@ -1,5 +1,5 @@
 #!/bin/bash
-# Execute with `source add_to_pythonpath.sh`.
+# Execute with `source setup_env.sh`.
 
 export PYTHONPATH=$(pwd):$PYTHONPATH  # add path for current module
 SUBMODULES=  # space-separateed list: "SUBMODULE1 SUBMODULE2 ..."
