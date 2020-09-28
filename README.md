@@ -4,7 +4,7 @@ This repository template is useful for developing Python packages with pre-commi
 
 ## Development setup
 
-1. (Optional:) Create a repo-specific Anaconda environment via `conda create -n $(basename -s .git `git config --get remote.origin.url)`.
+1. (Optional:) Create a repo-specific Anaconda environment via `conda create -n $(basename -s .git `git config --get remote.origin.url) python=3.8`.
 
 1. (Optional:) Install the package requirements via `pip install -r requirements.txt`.
 
