@@ -8,7 +8,7 @@ This repository template is useful for developing Python packages with pre-commi
 
 1. Install the development requirements via `pip install -r requirements_dev.txt`.
 
-1. (*Optional*:) Run `pre-commit install && pre-commit autoupdate && pre-commit run` to install, update, and cache all pre-commit tools.
+1. (*Optional*:) Run `pre-commit install && pre-commit run` to install, update, and cache all pre-commit tools.
 
 ## Execution setup
 
