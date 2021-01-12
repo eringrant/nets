@@ -6,6 +6,6 @@ repos:
     hooks:
     - id: flake8
 -   repo: https://github.com/eringrant/black
-    rev: 20.8b1
+    rev: 5c4cbc232bb70bc005a996d9d5dee93590990dfd
     hooks:
     - id: black
