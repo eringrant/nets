@@ -1,11 +1,11 @@
 default_language_version:
     python: python3.8
 repos:
--   repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.3
-    hooks:
-    - id: flake8
 -   repo: https://github.com/eringrant/black
     rev: 5c4cbc232bb70bc005a996d9d5dee93590990dfd
     hooks:
     - id: black
+-   repo: https://gitlab.com/pycqa/flake8
+    rev: 3.8.3
+    hooks:
+    - id: flake8
