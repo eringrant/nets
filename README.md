@@ -32,4 +32,8 @@ pip install -e .
 
 [`.pre-commit-config.yaml`](/.pre-commit-config.yaml) has been configured to run several autoformatters,
 including the [Black](https://black.readthedocs.io/) autoformatter as well as [Flake8](https://flake8.pycqa.org/).
-Run `pre-commit install && pre-commit run` to install, update, and cache all pre-commit tools.
+Run the following to install, update, and cache all pre-commit tools:
+
+```bash
+pre-commit install && pre-commit run
+```
