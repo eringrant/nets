@@ -2,16 +2,34 @@
 
 This repository template is useful for developing Python packages with pre-commit autoformatting.
 
-## Development setup
+## Installation
 
-1. (*Optional*:) Create a repo-specific Anaconda environment via `conda create -n $(basename -s .git $(git config --get remote.origin.url)) python=3.9`.
+### Option: Conda install
 
-1. Install the development requirements via `pip install -r requirements_dev.txt`.
+To install via [Conda](https://docs.conda.io/), do:
 
-1. (*Optional*:) Run `pre-commit install && pre-commit run` to install, update, and cache all pre-commit tools.
+```bash
+git clone git@github.com:eringrant/coding-project-template.git
+cd coding-project-template
+conda env create --file environment.yml
+```
 
-## Execution setup
+The Conda environment can then be activated via `conda activate TODO_package_name`.
 
-1. Install the package requirements via `pip install -r requirements.txt`.
+### Option: pip install
 
-1. Execute the setup script via `source setup_env.sh`. (If Anaconda is not in use, the last command will fail, but can be safely ignored.)
+To install via [pip](https://pip.pypa.io/), do:
+
+```bash
+git clone git@github.com:eringrant/coding-project-template.git
+cd coding-project-template
+pip install -e .
+```
+
+## Devtools
+
+### Pre-commit
+
+[`.pre-commit-config.yaml`](/.pre-commit-config.yaml) has been configured to run several autoformatters,
+including the [Black](https://black.readthedocs.io/) autoformatter as well as [Flake8](https://flake8.pycqa.org/).
+Run `pre-commit install && pre-commit run` to install, update, and cache all pre-commit tools.
