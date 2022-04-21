@@ -1,7 +1,16 @@
 # coding-project-template
 
 This repository template is useful for developing Python packages with pre-commit autoformatting.
-To cite this work, see "Cite this repository" in the sidebar.
+To cite this work, use:
+
+```
+@inproceedings{grant2019learning,
+  title={Learning deep taxonomic priors for concept learning from few positive examples},
+  author={Grant, Erin and Peterson, Joshua C and Griffiths, Thomas L},
+  booktitle={Proceedings of the Annual Conference of the Cognitive Science Society},
+  year={2019}
+}
+```
 
 ## Installation
 
