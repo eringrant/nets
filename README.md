@@ -1,6 +1,7 @@
 # coding-project-template
 
 This repository template is useful for developing Python packages with pre-commit autoformatting.
+To cite this work, see "Cite this repository" in the sidebar.
 
 ## Installation
 
