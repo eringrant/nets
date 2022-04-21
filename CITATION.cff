@@ -1,16 +1,8 @@
+cff-version: 1.2.0
 title: "My Research Software"
 authors:
   - family-names: "Grant"
     given-names: "Erin"
-cff-version: 1.2.0
-message: "If you use this software, please cite both the article from preferred-citation and the software itself."
-preferred-citation:
-  title: "Software paper about My Research Software"
-  authors:
-    - family-names: Druskat
-      given-names: Stephan
-    - family-names: "Grant"
-      given-names: "Erin"
-  type: article
-  collection-title: "Proceedings of the Research Conference 2021"
-  collection-type: proceedings
+type: article
+collection-title: "Proceedings of the Research Conference 2021"
+collection-type: proceedings
