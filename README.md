@@ -1,26 +1,27 @@
 # coding-project-template
 
 This repository template is useful for developing Python packages with pre-commit autoformatting.
-To cite this work, use:
+
+To cite the work that this code is associated with, use:
 
 ```
-@inproceedings{grant2019learning,
-  title={Learning deep taxonomic priors for concept learning from few positive examples},
-  author={Grant, Erin and Peterson, Joshua C and Griffiths, Thomas L},
-  booktitle={Proceedings of the Annual Conference of the Cognitive Science Society},
-  year={2019}
+@inproceedings{TODO_citation_key,
+  title={TODO},
+  author={TODO},
+  booktitle={TODO},
+  year={TODO}
 }
 ```
 
 ## Installation
 
-### Option: Conda install
+### Option #1: Conda install
 
 To install via [Conda](https://docs.conda.io/), do:
 
 ```bash
-git clone git@github.com:eringrant/coding-project-template.git
-cd coding-project-template
+git clone git@github.com:eringrant/TODO_package_name.git
+cd TODO_package_name
 conda env create --file environment.yml
 ```
 
@@ -31,8 +32,8 @@ The Conda environment can then be activated via `conda activate TODO_package_nam
 To install via [pip](https://pip.pypa.io/), do:
 
 ```bash
-git clone git@github.com:eringrant/coding-project-template.git
-cd coding-project-template
+git clone git@github.com:eringrant/TODO_package_name.git
+cd TODO_package_name
 pip install -e .
 ```
 
