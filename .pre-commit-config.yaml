@@ -2,7 +2,7 @@ default_language_version:
     python: python3.10
 repos:
 -   repo: https://github.com/eringrant/black
-    rev: 78689685b351e707b8d38e392933c15662913448
+    rev: f5ae8fd1c7c65a2c3b733a423fa203a499216839
     hooks:
     - id: black
 -   repo: https://gitlab.com/pycqa/flake8
