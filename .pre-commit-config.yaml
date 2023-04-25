@@ -1,5 +1,5 @@
 default_language_version:
-    python: python3.10
+    python: python3.11
 repos:
 -   repo: https://github.com/eringrant/black
     rev: f5ae8fd1c7c65a2c3b733a423fa203a499216839
