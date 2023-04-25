@@ -1,40 +1,27 @@
-# coding-project-template
+# nets
 
-This repository template is useful for developing Python packages with pre-commit autoformatting.
-
-To cite the work that this code is associated with, use:
-
-```
-@inproceedings{TODO_citation_key,
-  title={TODO},
-  author={TODO},
-  booktitle={TODO},
-  year={TODO}
-}
-```
+Equinox (JAX) neural nets.
 
 ## Installation
 
-### Option #1: Conda install
-
-To install via [Conda](https://docs.conda.io/), do:
+### Command-line
 
 ```bash
-git clone git@github.com:eringrant/TODO_package_name.git
-cd TODO_package_name
-conda env create --file environment.yml
+python -m pip install git+https://github.com/eringrant/nets
 ```
 
-The Conda environment can then be activated via `conda activate TODO_package_name`.
+### In a requirements file
 
-### Option: pip install
+```
+nets @ git+https://github.com/eringrant/nets
+```
 
-To install via [pip](https://pip.pypa.io/), do:
+### Locally & as an editable package
 
 ```bash
-git clone git@github.com:eringrant/TODO_package_name.git
-cd TODO_package_name
-pip install -e .
+git clone git@github.com:eringrant/nets.git
+cd nets/
+python -m pip install -e .
 ```
 
 ## Devtools
