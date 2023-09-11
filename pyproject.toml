@@ -23,8 +23,8 @@ exclude = '''
 [tool.ruff]
 target-version = 'py311'
 
-# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
-select = ["E", "F"]
+# Rule sets.
+select = ["D", "E", "F", "N", "UP"]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
@@ -63,3 +63,6 @@ line-length = 88
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.pydocstyle]
+convention = "google"
