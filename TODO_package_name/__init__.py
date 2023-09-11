@@ -1,3 +1,5 @@
+"""Module-wide constants for `TODO_package_name`."""
+# ruff: noqa: N999
 import TODO_package_name
 import os
 
