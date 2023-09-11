@@ -1,17 +1,19 @@
 default_language_version:
     python: python3.11
 repos:
--   repo: https://github.com/eringrant/black
-    rev: a29647f90feb3a1cfbc1c141810cd5f110ec6b54
-    hooks:
-    - id: black
--   repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.4
-    hooks:
-    - id: flake8
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.2.0
-    hooks:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.0.287
+  hooks:
+    - id: ruff
+      args: [ --fix, --exit-non-zero-on-fix ]
+      types_or: [python, pyi, jupyter]
+- repo: https://github.com/eringrant/black
+  rev: a29647f90feb3a1cfbc1c141810cd5f110ec6b54
+  hooks:
+  - id: black
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.2.0
+  hooks:
     - id: check-added-large-files
     - id: check-builtin-literals
     - id: check-case-conflict
