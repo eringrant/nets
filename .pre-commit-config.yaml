@@ -10,9 +10,9 @@ repos:
 - repo: https://github.com/eringrant/black
   rev: a29647f90feb3a1cfbc1c141810cd5f110ec6b54
   hooks:
-  - id: black
+    - id: black
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.2.0
+  rev: v4.4.0
   hooks:
     - id: check-added-large-files
     - id: check-builtin-literals
