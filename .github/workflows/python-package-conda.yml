@@ -16,10 +16,10 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install Conda environment from `environment.yml` with Micromamba
+      - name: Install Conda environment from `environment-cpu.yml` with Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          environment-file: environment.yml
+          environment-file: environment-cpu.yml
           init-shell: >-
             bash
             zsh
