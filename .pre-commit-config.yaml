@@ -1,34 +1,42 @@
 default_language_version:
-    python: python3.11
+  python: python3.11
+
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.0.287
-  hooks:
-    - id: ruff
-      args: [ --fix, --exit-non-zero-on-fix ]
-      types_or: [python, pyi, jupyter]
-- repo: https://github.com/eringrant/black
-  rev: a29647f90feb3a1cfbc1c141810cd5f110ec6b54
-  hooks:
-    - id: black
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.4.0
-  hooks:
-    - id: check-added-large-files
-    - id: check-builtin-literals
-    - id: check-case-conflict
-    - id: check-docstring-first
-    - id: check-executables-have-shebangs
-    - id: check-shebang-scripts-are-executable
-    - id: pretty-format-json
-    - id: check-merge-conflict
-    - id: check-symlinks
-    - id: check-vcs-permalinks
-    - id: debug-statements
-    - id: destroyed-symlinks
-    - id: detect-private-key
-    - id: end-of-file-fixer
-    - id: fix-byte-order-marker
-    - id: forbid-new-submodules
-    - id: mixed-line-ending
-    - id: name-tests-test
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.0.287
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi, jupyter]
+
+  - repo: https://github.com/eringrant/black
+    rev: a29647f90feb3a1cfbc1c141810cd5f110ec6b54
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.3
+    hooks:
+      - id: prettier
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: pretty-format-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-vcs-permalinks
+      - id: debug-statements
+      - id: destroyed-symlinks
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: forbid-new-submodules
+      - id: mixed-line-ending
+      - id: name-tests-test
