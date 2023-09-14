@@ -1,4 +1,4 @@
-name: TODO_package_name
+name: nets
 
 channels:
   - default
@@ -11,26 +11,20 @@ dependencies:
   - pre-commit
 
   - numpy
-  - pandas>=2.0.0
+  - pandas>=2.0
   - pytables
   - submitit
 
   # NOTE: The following requires a GPU node available
   # at the time of creating the environment.
   # CUDA:
-  # - conda-forge::cudatoolkit>=11.8
-  # - nvidia::cuda>=11.8
-
-  # PyTorch:
-  # - pytorch::pytorch-cuda>=12.0
-  # - pytorch::pytorch
-  # - pytorch::torchvision
-  # - huggingface::transformers
+  - conda-forge::cudatoolkit>=12.0
+  - nvidia::cuda>=12.0
 
   # JAX:
-  # - nvidia::cuda-nvcc>=12.0
-  # - conda-forge::jaxlib=*=*cuda*
-  # - conda-forge::jax
+  - nvidia::cuda-nvcc>=12.0
+  - conda-forge::jaxlib=*=*cuda*
+  - conda-forge::jax
 
   - pip
   - pip:

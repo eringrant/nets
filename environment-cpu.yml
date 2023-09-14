@@ -1,4 +1,4 @@
-name: TODO_package_name
+name: nets
 
 channels:
   - default
@@ -15,13 +15,8 @@ dependencies:
   - pytables
   - submitit
 
-  # PyTorch:
-  # - pytorch::pytorch
-  # - pytorch::torchvision
-  # - huggingface::transformers
-
   # JAX:
-  # - conda-forge::jax
+  - conda-forge::jax
 
   - pip
   - pip:
