@@ -531,7 +531,7 @@ class Transformer(eqx.Module):
 
     # Residual stream.
     residual = x
-    for key_, blk in zip(keys, self.blocks):
+    for key_, blk in zip(keys, self.blocks, strict=True):
       residual = blk(residual, key=key_)
     residual = jax.vmap(self.norm)(residual)
 

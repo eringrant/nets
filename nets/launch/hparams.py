@@ -80,12 +80,10 @@ class UniformParam(Param):
     """Initialize a uniform hyperparameter."""
     super().__init__()
     if min_value >= max_value:
-      raise ValueError(
-        "Invalid minimum or maximum values: " f"{min_value} >= {max_value}"
-      )
+      raise ValueError(f"Invalid minimum or maximum values: {min_value} >= {max_value}")
     if type(min_value) != type(max_value):
       raise ValueError(
-        "Conflicting data types: " f"{type(min_value)} != {type(max_value)}"
+        f"Conflicting data types: {type(min_value)} != {type(max_value)}"
       )
 
     self.min_value = min_value
@@ -116,7 +114,7 @@ class LogUniformParam(UniformParam):
     """Initialize a log-uniform hyperparameter."""
     if type(min_value) != type(max_value):
       raise ValueError(
-        "Received conflicting data types: " f"{type(min_value)} != {type(max_value)}"
+        f"Received conflicting data types: {type(min_value)} != {type(max_value)}"
       )
 
     if 0.0 < base < 1.0:

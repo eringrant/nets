@@ -24,7 +24,17 @@ exclude = '''
 target-version = 'py311'
 
 # Rule sets.
-select = ["D", "E", "F", "N", "UP"]
+select = [
+  "A", 
+  "B", 
+  "D", 
+  "E", 
+  "F", 
+  "ISC", 
+  "N", 
+  "RUF", 
+  "UP",
+]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

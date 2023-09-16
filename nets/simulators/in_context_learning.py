@@ -261,9 +261,7 @@ def evaluate(
   # metrics["last layer bias norm"] = float(jnp.linalg.norm(model.unembed.bias))
 
   end = time.time()
-  print(
-    f"Completed evaluation over {num_examples} examples " f"in {end - start:.2f} secs."
-  )
+  print(f"Completed evaluation over {num_examples} examples in {end - start:.2f} secs.")
 
   print("####")
   print(f"ITERATION {iteration}")
@@ -484,7 +482,7 @@ def simulate(
     pd.concat(sampler_metrics).assign(dataset=sampler_name)
     for sampler_name, sampler_metrics in metrics.items()
   )
-  df = df[df.columns[[-1] + list(range(0, len(df.columns) - 1))]]
+  df = df[df.columns[[-1, *list(range(0, len(df.columns) - 1))]]]
   df["dataset"] = df["dataset"].astype(
     CategoricalDtype(categories=metrics.keys(), ordered=True)
   )
