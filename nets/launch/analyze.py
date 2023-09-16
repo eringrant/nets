@@ -136,7 +136,9 @@ df = pd.read_hdf('{results_path}')
 # TODO(eringrant): Generalize to arbitrary #s.
 def pd_categorical_concat(df1, df2):
   """DFs must have common columns."""
-  for col1, col2 in zip(df1.select_dtypes("category"), df2.select_dtypes("category")):
+  for col1, col2 in zip(
+    df1.select_dtypes("category"), df2.select_dtypes("category"), strict=True
+  ):
     assert col1 == col2
     if df1[col1].cat != df2[col2].cat:
       union_cat = pd.Series(
