@@ -1,4 +1,27 @@
-"""Configs to pass as `kwargs` to `nets.simulate.in_context_learning`."""
+"""Configs to pass as `kwargs` to simulators within `nets.simulators`.
+
+This config and its subclasses can be iterated over to pass keyword arguments
+to a function, say `simulate`, as follows:
+
+To simulate a single configuration:
+```
+cfg = next(iter(Config(...)))
+simulate(**cfg)
+```
+
+To simulate all configurations in sequence:
+```
+for cfg in Config(...):
+  simulate(**cfg)
+```
+
+To use `submitit` to submit a job array of simulations:
+```
+from nets.launch.submit import Executor
+executor = Executor(...)
+executor.starmap_array(simulate, Config(...))
+```
+"""
 from typing import Any
 from collections.abc import Mapping
 from itertools import count
@@ -9,15 +32,10 @@ from dataclasses import field
 from dataclasses import fields
 
 from nets.launch.hparams import Param
-from nets.launch.hparams import FixedParam
-from nets.launch.hparams import EnumParam
 
-from nets import datasets
-from nets import samplers
 
 import numpy as np
 import jax
-import optax
 
 
 # TODO(eringrant): Re-enable grid search if all hyperparameters are enums.
@@ -28,6 +46,9 @@ class Config:
 
   key: jax.random.PRNGKey  # Randomness for hyperparameter sampling.
   num_configs: int  # Number of hyperparameter configurations.
+
+  # Dataclass fields shared by all subclasses.
+  seed: Param = field(init=False)
 
   def __post_init__(self):
     """Check that types are as expected after initialization."""
@@ -95,163 +116,3 @@ class Config:
     )
 
     return dict(zip(hparam_names, hparam_samples, strict=True))
-
-
-@dataclass(frozen=True, kw_only=True)
-class SearchConfig(Config):
-  """Generic config for a hyperparameter search.
-
-  This config and its subclasses can be iterated over to pass keyword arguments
-  to `nets.simulate.simulate` as follows:
-
-  ```
-  cfg = next(iter(configs.SearchConfig(...)))
-  nets.simulate.simulate(**cfg)
-  ```
-
-  or:
-
-  ```
-  for cfg in configs.SearchConfig(...):
-    nets.simulate.simulate(**cfg)
-  ```
-
-  See also `scripts/launcher_...` for examples of using these configs with
-  `submitit.Executor.map_array`.
-  """
-
-  seed: Param = field(default_factory=lambda: EnumParam(range(0, 3)))
-
-  # Model params.
-  embed_dim: Param = field(init=False)
-  num_heads: Param = field(init=False)
-  depth: Param = field(init=False)
-  mlp_ratio: Param = field(init=False)
-  causal: Param = field(init=False)
-
-  # Training and evaluation params.
-  optimizer_fn: Param = field(default_factory=lambda: FixedParam(optax.adam))
-  learning_rate: Param = field(default_factory=lambda: FixedParam(1e-3))
-  train_batch_size: Param = field(default_factory=lambda: FixedParam(32))
-  eval_batch_size: Param = field(default_factory=lambda: FixedParam(32))
-  num_epochs: Param = field(default_factory=lambda: FixedParam(1))
-  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(100))
-  evaluate_on_test_split: Param = field(default_factory=lambda: FixedParam(False))
-
-  # Dataset params.
-  num_train_classes: Param = field(init=False)  # `init=False` toavoid init
-  num_valid_classes: Param = field(init=False)  # of to-be-overridden value.
-  num_test_classes: Param = field(init=False)
-  prop_train_labels: Param = field(init=False)
-  prop_valid_labels: Param = field(init=False)
-  prop_test_labels: Param = field(init=False)
-  dataset_cls: Param = field(init=False)
-  exemplar_labeling: Param = field(init=False)
-  holdout_class_labeling: Param = field(init=False)
-  num_exemplars_per_class: Param = field(init=False)
-  exemplar_noise_scale: Param = field(init=False)
-
-  # Sampler params.
-  num_train_seqs: Param = field(init=False)
-  num_eval_seqs: Param = field(init=False)
-  train_sampler_cls: Param = field(init=False)
-  eval_sampler_cls: Param = field(init=False)
-  train_query_type: Param = field(init=False)
-  train_context_len: Param = field(init=False)
-  train_zipf_exponent: Param = field(init=False)
-  train_relabeling: Param = field(init=False)
-
-
-@dataclass(frozen=True, kw_only=True)
-class DebugSearchConfig(SearchConfig):
-  """Singleton config for debugging."""
-
-  seed: Param = field(default_factory=lambda: FixedParam(0))
-
-  num_epochs: Param = field(default_factory=lambda: FixedParam(0))  # No training.
-  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(1))
-
-  embed_dim: Param = field(default_factory=lambda: FixedParam(8))  # Teeny tiny model.
-  num_heads: Param = field(default_factory=lambda: FixedParam(8))
-  depth: Param = field(default_factory=lambda: FixedParam(2))
-  mlp_ratio: Param = field(default_factory=lambda: FixedParam(4.0))
-  causal: Param = field(default_factory=lambda: FixedParam(True))
-
-  num_train_classes: Param = field(default_factory=lambda: FixedParam(80))
-  num_valid_classes: Param = field(default_factory=lambda: FixedParam(20))
-  num_test_classes: Param = field(default_factory=lambda: FixedParam(16))
-  prop_train_labels: Param = field(default_factory=lambda: FixedParam(0.8))
-  prop_valid_labels: Param = field(default_factory=lambda: FixedParam(0.7))
-  prop_test_labels: Param = field(default_factory=lambda: FixedParam(0.3))
-  dataset_cls: Param = field(
-    default_factory=lambda: FixedParam(datasets.SymbolicDataset)
-  )
-  exemplar_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.ExemplarLabeling.STANDARD)
-  )
-  holdout_class_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.HoldoutClassLabeling.STANDARD)
-  )
-  num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(20))
-  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(1.0))
-
-  num_train_seqs: Param = field(default_factory=lambda: FixedParam(int(1e3)))
-  num_eval_seqs: Param = field(default_factory=lambda: FixedParam(int(1e2)))
-  train_sampler_cls: Param = field(
-    default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
-  )
-  eval_sampler_cls: Param = field(
-    default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
-  )
-  train_query_type: Param = field(
-    default_factory=lambda: FixedParam(samplers.QueryType.SUPPORTED)
-  )
-  train_context_len: Param = field(default_factory=lambda: FixedParam(2))
-  train_zipf_exponent: Param = field(default_factory=lambda: FixedParam(1.0))
-  train_relabeling: Param = field(default_factory=lambda: FixedParam(False))
-
-
-@dataclass(frozen=True, kw_only=True)
-class SymbolicSearchConfig(SearchConfig):
-  """Singleton hyperparameter search for the symbolic dataset."""
-
-  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(100))
-
-  embed_dim: Param = field(default_factory=lambda: FixedParam(64))
-  num_heads: Param = field(default_factory=lambda: FixedParam(8))
-  depth: Param = field(default_factory=lambda: FixedParam(2))
-  mlp_ratio: Param = field(default_factory=lambda: FixedParam(4.0))
-  causal: Param = field(default_factory=lambda: FixedParam(True))
-
-  num_train_classes: Param = field(default_factory=lambda: FixedParam(1600))
-  num_valid_classes: Param = field(default_factory=lambda: FixedParam(2))
-  num_test_classes: Param = field(default_factory=lambda: FixedParam(2))
-  prop_train_labels: Param = field(default_factory=lambda: FixedParam(1.0))
-  prop_valid_labels: Param = field(default_factory=lambda: FixedParam(1.0))
-  prop_test_labels: Param = field(default_factory=lambda: FixedParam(1.0))
-  dataset_cls: Param = field(
-    default_factory=lambda: FixedParam(datasets.SymbolicDataset)
-  )
-  exemplar_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.ExemplarLabeling.STANDARD)
-  )
-  holdout_class_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.HoldoutClassLabeling.TRAIN_LABELS)
-  )
-  num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(20))
-  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(0.1))
-
-  num_train_seqs: Param = field(default_factory=lambda: FixedParam(int(1e5 * 32)))
-  num_eval_seqs: Param = field(default_factory=lambda: FixedParam(int(1e2 * 32)))
-  train_sampler_cls: Param = field(
-    default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
-  )
-  eval_sampler_cls: Param = field(
-    default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
-  )
-  train_query_type: Param = field(
-    default_factory=lambda: FixedParam(samplers.QueryType.SUPPORTED)
-  )
-  train_context_len: Param = field(default_factory=lambda: FixedParam(2))
-  train_zipf_exponent: Param = field(default_factory=lambda: FixedParam(1.0))
-  train_relabeling: Param = field(default_factory=lambda: FixedParam(True))

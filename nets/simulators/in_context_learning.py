@@ -488,17 +488,3 @@ def simulate(
   )
 
   return df
-
-
-if __name__ == "__main__":
-  from nets.launch import configs
-
-  cfg = next(
-    iter(
-      configs.DebugSearchConfig(
-        key=jax.random.PRNGKey(0),
-        num_configs=1,
-      )
-    )
-  )
-  simulate(**cfg)
