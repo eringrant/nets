@@ -29,6 +29,8 @@ MAX_NUM_SEQS = int(1e7)
 
 @unique
 class QueryType(Enum):
+  """Types of queries that can be generated from a `Sampler`."""
+
   # Generate the query in the same manner as the context.
   NATURALISTIC = 1
   # Generate a query from classes in the context.
@@ -38,10 +40,12 @@ class QueryType(Enum):
 
 
 def zipfian_weights(num_classes: int, zipf_exponent: float) -> Array:
+  """Compute Zipfian weights for `num_classes` classes."""
   return jnp.exp(-zipf_exponent * jnp.log(jnp.arange(1, num_classes + 1)))
 
 
 def zipfian_distribution(num_classes: int, zipf_exponent: float) -> Array:
+  """Compute Zipfian distribution for `num_classes` classes."""
   weights = zipfian_weights(num_classes, zipf_exponent)
   return weights / jnp.sum(weights)
 
@@ -88,12 +92,18 @@ def generate_exemplar_idx_sequence(
 
 
 class ClassSampler(Protocol):
+  """Protocol for a function that generates a sequence of class indices."""
+
   def __call__(self, key: KeyArray, num_classes: int) -> Array:
+    """Generate a sequence of class indices."""
     ...
 
 
 class ExemplarSampler(Protocol):
+  """Protocol for a function that generates a sequence of exemplar indices."""
+
   def __call__(self, key: KeyArray, label_seq: Array, dataset_labels: Array) -> Array:
+    """Generate a sequence of exemplar indices."""
     ...
 
 
@@ -200,7 +210,6 @@ class ClassificationSequenceSampler(SequenceSampler):
       raise ValueError(f"Class split has too few classes: {class_split}")
 
     self._dataset = dataset
-    self.relabel_sequences = relabel_sequences
     self.num_seqs = num_seqs
 
     # Compile functions for sampling at `Sampler.__init__`.
@@ -217,21 +226,26 @@ class ClassificationSequenceSampler(SequenceSampler):
     )
 
     def relabel_sequence(key, labels):
-      N = self._dataset.num_observed_classes
-      onehot_labels = jnn.one_hot(labels, N)
-      perm = jax.random.permutation(key, N)
-      relabeling = jnp.eye(N)[perm]
+      n = self._dataset.num_observed_classes
+      onehot_labels = jnn.one_hot(labels, n)
+      perm = jax.random.permutation(key, n)
+      relabeling = jnp.eye(n)[perm]
       return (onehot_labels @ relabeling).argmax(axis=-1)
 
     if relabel_sequences:
       self.relabel_sequences = jax.jit(jax.vmap(relabel_sequence))
     else:
-      self.relabel_sequences = None
+
+      def identity(x):
+        return x
+
+      self.relabel_sequences = jax.jit(jax.vmap(identity))
 
     # PRNG depends on `MAX_NUM_SEQS` parameter in the infinite `Sampler` case.
     self._seq_keys = jax.random.split(key, num_seqs or MAX_NUM_SEQS)
 
   def __len__(self) -> int:
+    """Return the number of sequences in `Sampler`."""
     if self.num_seqs is None:
       raise AttributeError("An infinite sequence does not have finite length.")
     return self.num_seqs
@@ -271,16 +285,16 @@ class ClassificationSequenceSampler(SequenceSampler):
       exemplars = exemplars[0]
       labels = labels[0]
 
-    if self.relabel_sequences is not None:
-      labels = self.relabel_sequences(
-        jax.vmap(jax.random.split)(seq_key)[:, 0, :],
-        labels,
-      )
+    labels = self.relabel_sequences(
+      jax.vmap(jax.random.split)(seq_key)[:, 0, :],
+      labels,
+    )
 
     return exemplars, labels
 
   # TODO(eringrant): Make less brittle (reliant on copying & setting attributes).
   def take(self, count: int) -> Sampler:
+    """Return a `Sampler` with the first `count` sequences of `Sampler`."""
     take_dataset = copy.copy(self)
     take_dataset._seq_keys = self._seq_keys[:count]
     take_dataset.num_seqs = count

@@ -25,6 +25,7 @@ from collections.abc import Sequence
 def trunc_normal_init(
   weight: Array, key: KeyArray, stddev: float | None = None
 ) -> Array:
+  """Truncated normal distribution initialization."""
   _, in_ = weight.shape
   stddev = stddev or sqrt(1.0 / max(1.0, in_))
   return stddev * jax.random.truncated_normal(
@@ -35,10 +36,11 @@ def trunc_normal_init(
   )
 
 
+# Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py.
 def lecun_normal_init(
   weight: Array, key: KeyArray, scale: float | None = None
 ) -> Array:
-  """Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py."""
+  """LeCun (variance-scaling) normal distribution initialization."""
   _, in_ = weight.shape
   scale /= max(1.0, in_)
 
@@ -52,14 +54,17 @@ def lecun_normal_init(
 
 
 class StopGradient(eqx.Module):
+  """Stop gradient wrapper."""
+
   array: jnp.ndarray
 
   def __jax_array__(self):
+    """Return the array wrapped with a stop gradient op."""
     return jax.lax.stop_gradient(self.array)
 
 
 class Linear(enn.Linear):
-  """Linear layer with variance scaling init (LeCun init)."""
+  """Linear layer."""
 
   def __init__(
     self,
@@ -71,6 +76,7 @@ class Linear(enn.Linear):
     key: KeyArray,
     init_scale: float | None = 1.0,
   ):
+    """Initialize a linear layer."""
     super().__init__(
       in_features=in_features,
       out_features=out_features,
@@ -109,6 +115,7 @@ class LinearTokenEmbed(enn.Linear, TokenEmbed):
     *,
     key: KeyArray,
   ):
+    """Initialize a linear token embedding layer."""
     if isinstance(input_shape, int):
       input_shape = (input_shape,)
     super().__init__(
@@ -139,6 +146,7 @@ class LinearPosEmbed(enn.Embedding, PosEmbed):
     *,
     key: KeyArray,
   ):
+    """Initialize a linear positional embedding."""
     super().__init__(
       num_embeddings=LinearPosEmbed.MAX_SEQ_LEN,
       embedding_size=embedding_size,
@@ -151,12 +159,10 @@ class LinearPosEmbed(enn.Embedding, PosEmbed):
     return super().__call__(jnp.pad(x, (0, pad_size), "constant"))
 
 
+# Adapted from
+# https://github.com/google-deepmind/emergent_in_context_learning/blob/eba75a4208b8927cc1e981384a2cc7e014677095/modules/embedding.py#L27-L56
 class SinusoidalPosEmbed(enn.Embedding, PosEmbed):
-  """Sinusoidal positional embedding.
-
-  Reproduction of
-  https://github.com/deepmind/emergent_in_context_learning/blob/main/modules/embedding.py#L27-L56.
-  """
+  """Sinusoidal positional embedding."""
 
   embedding_size: int = eqx.static_field()
 
@@ -166,13 +172,14 @@ class SinusoidalPosEmbed(enn.Embedding, PosEmbed):
     max_time: float = 30.0,
     *,
     key: KeyArray,
-    **kwargs,
   ):
-    """**Arguments:**
-    - `embedding_size`: Size of each embedding vector.
-    - `max_time`: Position scaling factor.
-    - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter
-        initialisation. (Keyword only argument.).
+    """Initialize a sinusoidal positional embedding.
+
+    Args:
+      embedding_size: Size of each embedding vector.
+      max_time: Position scaling factor.
+      key: A `jax.random.PRNGKey` used to provide randomness for parameter
+        initialisation (keyword-only argument).
     """
     if embedding_size % 2 == 1:
       raise ValueError("Embedding size must be even if using sinusoidal encoding.")
@@ -197,7 +204,7 @@ class SinusoidalPosEmbed(enn.Embedding, PosEmbed):
 
 
 class MLPBlock(eqx.Module):
-  """TODO."""
+  """Multi-layer perceptron head as used in a transformer."""
 
   fc1: eqx.Module
   act: Callable
@@ -215,15 +222,16 @@ class MLPBlock(eqx.Module):
     *,
     key: KeyArray = None,
   ):
-    """TODO.
+    """Initialize an MLP block.
 
     Args:
-    - `in_features`: The expected dimension of the input.
-    - `hidden_features`: Dimensionality of the hidden layer.
-    - `out_features`: The dimension of the output feature.
-    - `act`: Activation function to be applied to the intermediate layers.
-    - `drop`: The probability associated with `Dropout`.
-    - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter initialisation.
+       in_features: The expected dimension of the input.
+       hidden_features: Dimensionality of the hidden layer.
+       out_features: The dimension of the output feature.
+       act: Activation function to be applied to the intermediate layers.
+       drop: The probability associated with `Dropout`.
+       key: A `jax.random.PRNGKey` used to provide randomness for parameter
+        initialisation.
     """
     super().__init__()
     out_features = out_features or in_features
@@ -242,6 +250,7 @@ class MLPBlock(eqx.Module):
     self.drop2 = enn.Dropout(drop_probs[1])
 
   def __call__(self, x: Array, *, key: KeyArray) -> Array:
+    """Apply the MLP block to the input."""
     keys = jrandom.split(key, 2)
     x = self.fc1(x)
     x = self.act(x)
@@ -252,7 +261,7 @@ class MLPBlock(eqx.Module):
 
 
 class AttentionBlock(eqx.Module):
-  """TODO."""
+  """An attention block as used in a transformer."""
 
   num_heads: int
   scale: float
@@ -274,17 +283,19 @@ class AttentionBlock(eqx.Module):
     *,
     key: KeyArray,
   ):
-    """TODO.
+    """Initialize an attention block.
 
     Args:
-    - `dim`: The feature dimensions of the input.
-    - `num_heads`: The number of attention heads.
-    - `causal`: Whether or not to use causal attention.
-    - `qkv_bias`: Whether to use bias a bias term in the query-key-value computation.
-    - `qk_scale`: Scalar multiplier for the query-value (unnormalized attention) computation.
-    - `attn_drop`: Dropout rate for attention.
-    - `proj_drop`: Dropout rate for projection.
-    - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter initialisation.
+      dim: The feature dimensions of the input.
+      num_heads: The number of attention heads.
+      causal: Whether or not to use causal attention.
+      qkv_bias: Whether to use bias a bias term in the query-key-value computation.
+      qk_scale: Scalar multiplier for the query-value (unnormalized attention)
+          computation.
+      attn_drop: Dropout rate for attention.
+      proj_drop: Dropout rate for projection.
+      key: A `jax.random.PRNGKey` used to provide randomness for parameter
+          initialisation.
     """
     super().__init__()
     keys = jrandom.split(key, 2)
@@ -304,22 +315,23 @@ class AttentionBlock(eqx.Module):
     self.proj_drop = enn.Dropout(proj_drop)
 
   def __call__(self, x: Array, *, key: KeyArray) -> Sequence[Array]:
-    N, C = x.shape
+    """Apply the attention block to the input."""
+    n, c = x.shape
     keys = jrandom.split(key, 2)
     qkv = jax.vmap(self.qkv)(x)
-    qkv = jnp.reshape(qkv, (N, 3, self.num_heads, C // self.num_heads))
+    qkv = jnp.reshape(qkv, (n, 3, self.num_heads, c // self.num_heads))
     qkv = jnp.transpose(qkv, axes=(1, 2, 0, 3))
     q, k, v = jnp.split(qkv, indices_or_sections=3)
 
     attn = (q @ jnp.transpose(k, (0, 1, 3, 2))) * self.scale
     if self.causal:
-      mask = jnp.arange(N)[:, None] >= jnp.arange(N)[None, :]
+      mask = jnp.arange(n)[:, None] >= jnp.arange(n)[None, :]
       attn = attn * mask[None, None, :, :] + (1 - mask)[None, None, :, :] * -1e6
 
     attn = jnn.softmax(attn, axis=-1)
     attn = self.attn_drop(attn, key=keys[0])
 
-    x = jnp.reshape(jnp.transpose((attn @ v), axes=(0, 2, 1, 3)), (N, C))
+    x = jnp.reshape(jnp.transpose((attn @ v), axes=(0, 2, 1, 3)), (n, c))
     x = jax.vmap(self.proj)(x)
     x = self.proj_drop(x, key=keys[1])
 
@@ -327,9 +339,7 @@ class AttentionBlock(eqx.Module):
 
 
 class TransformerBlock(eqx.Module):
-  """TODO."""
-
-  mlp_ratio: float | None
+  """A transformer block as used in a transformer."""
 
   norm1: eqx.Module
   attn: AttentionBlock
@@ -344,10 +354,10 @@ class TransformerBlock(eqx.Module):
     dim: int,
     num_heads: int,
     causal: bool,
-    mlp_ratio: float | None = 4.0,
+    mlp_ratio: float = 4.0,
     qkv_bias: bool = False,
     qk_scale: float | None = None,
-    mlp_drop: float = 0.0,
+    mlp_drop: float = 4.0,
     attn_drop: float = 0.0,
     proj_drop: float = 0.0,
     path_drop: float = 0.0,
@@ -356,22 +366,23 @@ class TransformerBlock(eqx.Module):
     *,
     key: KeyArray,
   ) -> None:
-    """TODO.
+    """Initialize a transformer block.
 
     Args:
-    - `dim`: The feature dimensions of the input.
-    - `num_heads`: The number of equal parts to split the input along the `dim`.
-    - `causal`: Whether or not to use causal attention.
-    - `mlp_ratio`: For computing hidden dimension of the `MLPBlock` (=`dim * mlp_ratio`).
-    - `qkv_bias`: To add `bias` within the `qkv` computation.
-    - `qk_scale`: For scaling the `query` `value` computation.
-    - `mlp_drop`: Dropout rate for the `MLPBlock`.
-    - `attn_drop`: Dropout rate for the `AttentionBlock`.
-    - `proj_drop`: Dropout rate for the `projection.
-    - `path_drop`: Dropout rate for the non-residual pathway.
-    - `act`: Activation applied on the intermediate outputs.
-    - `norm_layer`: Normalisation applied to the intermediate outputs.
-    - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter initialisation.
+      dim: The feature dimensions of the input.
+      num_heads: The number of equal parts to split the input along the `dim`.
+      causal: Whether or not to use causal attention.
+      mlp_ratio: For computing hidden dimension of the `MLPBlock` (=`dim * mlp_ratio`).
+      qkv_bias: To add `bias` within the `qkv` computation.
+      qk_scale: For scaling the `query` `value` computation.
+      mlp_drop: Dropout rate for the `MLPBlock`.
+      attn_drop: Dropout rate for the `AttentionBlock`.
+      proj_drop: Dropout rate for the `projection.
+      path_drop: Dropout rate for the non-residual pathway.
+      act: Activation applied on the intermediate outputs.
+      norm_layer: Normalisation applied to the intermediate outputs.
+      key: A `jax.random.PRNGKey` used to provide randomness for parameter
+          initialisation.
     """
     super().__init__()
     keys = jrandom.split(key, 2)
@@ -389,8 +400,7 @@ class TransformerBlock(eqx.Module):
     )
     self.drop_path1 = enn.Dropout(path_drop) if path_drop > 0.0 else enn.Identity()
 
-    self.mlp_ratio = mlp_ratio
-    if self.mlp_ratio is not None:
+    if mlp_ratio > 0:
       self.norm2 = norm_layer(dim) if norm_layer else enn.Identity()
       self.mlp = MLPBlock(
         in_features=dim,
@@ -407,6 +417,7 @@ class TransformerBlock(eqx.Module):
       self.drop_path2 = None
 
   def __call__(self, x: Array, *, key: KeyArray) -> Array:
+    """Apply the transformer block to the input."""
     keys = jrandom.split(key, 4)
 
     # Attention block.
@@ -414,7 +425,7 @@ class TransformerBlock(eqx.Module):
     y, attn = self.attn(y, key=keys[0])
     x = x + self.drop_path1(y, key=keys[1])
 
-    if self.mlp_ratio is not None:
+    if self.norm2 is not None and self.mlp is not None and self.drop_path2 is not None:
       # MLP head.
       y = jax.vmap(self.norm2)(x)
       y = jax.vmap(self.mlp)(y, key=jrandom.split(keys[2], x.shape[0]))
@@ -424,7 +435,7 @@ class TransformerBlock(eqx.Module):
 
 
 class Transformer(eqx.Module):
-  """TODO."""
+  """A transformer model."""
 
   embed_dim: int
 
@@ -441,7 +452,7 @@ class Transformer(eqx.Module):
     depth: int,
     num_heads: int,
     causal: bool,
-    mlp_ratio: float | None = 4.0,
+    mlp_ratio: float = 4.0,
     qkv_bias: bool = True,
     qk_scale: float | None = None,
     tok_embed_drop_rate: float = 0.0,
@@ -453,28 +464,32 @@ class Transformer(eqx.Module):
     *,
     key: KeyArray,
   ) -> None:
-    """TODO:
+    """Initialize a transformer model.
 
     Args:
-    - `num_classes`: Number of classes in the classification task, or `None` to omit output projection.
-    - `embed_dim`: The input embedding dimension.
-    - `depth`: Number of `TransformerBlock`s in the network.
-    - `num_heads`: Number of attention heads within each `AttentionBlock`.
-    - `causal`: Whether or not to use causal attention.
-    - `mlp_ratio`: For computing hidden dimension of the `MLPBlock`s, or `None` to omit MLP heads.
-    - `qkv_bias`: Whether to use bias a bias term in the query-key-value computation.
-    - `qk_scale`: Scalar multiplier for the query-value computation; defaults to `1 / sqrt(head_dim)`.
-    - `embed_drop_rate`: Dropout rate used for the embedding matrix.
-    - `mlp_drop_rate`: Dropout rate used within the `MLPBlock`.
-    - `attn_drop_rate`: Dropout rate used within the `AttentionBlock`s.
-    - `path_drop_rate`: Dropout rate used within `TransformerBlock`s.
-    - `norm_layer`: Normalisation applied to the intermediate outputs.
-    - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter initialisation.
+      num_classes: Number of classes in the classification task, or `None` to omit
+          output projection.
+      embed_dim: The input embedding dimension.
+      depth: Number of `TransformerBlock`s in the network.
+      num_heads: Number of attention heads within each `AttentionBlock`.
+      causal: Whether or not to use causal attention.
+      mlp_ratio: For computing hidden dimension of the `MLPBlock` (=`dim * mlp_ratio`).
+      qkv_bias: Whether to use bias a bias term in the query-key-value computation.
+      qk_scale: Scalar multiplier for the query-value computation; defaults to
+         `1 / sqrt(head_dim)`.
+      tok_embed_drop_rate: Dropout rate used for the token embedding matrix.
+      pos_embed_drop_rate: Dropout rate used for the positional embedding matrix.
+      mlp_drop_rate: Dropout rate used within the `MLPBlock`.
+      attn_drop_rate: Dropout rate used within the `AttentionBlock`s.
+      path_drop_rate: Dropout rate used within `TransformerBlock`s.
+      norm_layer: Normalisation applied to the intermediate outputs.
+      key: A `jax.random.PRNGKey` used to provide randomness for parameter
+          initialisation.
     """
     super().__init__()
     keys = jrandom.split(key, depth + 3)
 
-    # Switch to `inference` mode for evaluations via `model = eqx.tree_inference(model)`.
+    # Switch to inference mode for evaluation via `model = eqx.tree_inference(model)`.
     self.inference = False
 
     # Size of the embedding and thus the residual stream.
@@ -508,12 +523,13 @@ class Transformer(eqx.Module):
     )
 
   def __call__(self, x: Array, *, key: KeyArray) -> Array:
+    """Apply the transformer to the input."""
     keys = jrandom.split(key, len(self.blocks))
 
     # `x` should be a sequence of embeddings.
     assert len(x.shape) == 2 and x.shape[1] == self.embed_dim
 
-    # Residual stream
+    # Residual stream.
     residual = x
     for key_, blk in zip(keys, self.blocks):
       residual = blk(residual, key=key_)
@@ -523,7 +539,7 @@ class Transformer(eqx.Module):
     return jax.vmap(self.unembed)(residual)
 
 
-# TODO(eringrant): Factorize `Transformer` rather than passing kwargs.
+# TODO(eringrant): Factor out `Transformer` rather than passing kwargs.
 class SequenceClassifier(eqx.Module):
   """A model that ingests image-label pairs as a sequence."""
 
@@ -564,24 +580,25 @@ class SequenceClassifier(eqx.Module):
     """A model that ingests image-label pairs as a sequence.
 
     Args:
-      - `example_shape`: The shape of input examples.
-      - `num_classes`: The number of classes to predict.
-      - `embed_dim`: The dimension of the embedding, and thus the residual stream.
-      - `train_embed`: Whether or not to train the embedding layer.
-      - `example_embed_cls`: The example embedding class.
-      - `example_embed_drop_rate`: The dropout probability for example embeddings.
-      - `deterministic_example_embed_drop`: Whether to associate a deterministic
+      example_shape: The shape of input examples.
+      num_classes: The number of classes to predict.
+      embed_dim: The dimension of the embedding, and thus the residual stream.
+      train_embed: Whether or not to train the embedding layer.
+      example_embed_cls: The example embedding class.
+      example_embed_drop_rate: The dropout probability for example embeddings.
+      deterministic_example_embed_drop: Whether to associate a deterministic
         dropout pattern with each exemplar.
-      - `pos_embed_cls`: The positional embedding class.
-      - `pos_embed_drop_rate`: The dropout probability for positional embeddings.
-      - `key`: A key for randomness in parameter initialization.
-      - `transformer_kwargs`: Remaining keyword arguments to be passed to the wrapped
+      label_embed_drop_rate: The dropout probability for label embeddings.
+      pos_embed_cls: The positional embedding class.
+      pos_embed_drop_rate: The dropout probability for positional embeddings.
+      key: A key for randomness in parameter initialization.
+      transformer_kwargs: Remaining keyword arguments to be passed to the wrapped
         Transformer.
     """
     super().__init__()
     keys = jrandom.split(key, 5)
 
-    # Switch to `inference` mode for evaluations via `model = eqx.tree_inference(model)`.
+    # Switch to inference mode for evaluation via `model = eqx.tree_inference(model)`.
     self.inference = False
 
     # Example embeddings.
@@ -598,7 +615,7 @@ class SequenceClassifier(eqx.Module):
     self.deterministic_example_embed_drop = deterministic_example_embed_drop
 
     # Label embeddings initialized like
-    # https://github.com/deepmind/emergent_in_context_learning/blob/main/modules/embedding.py#L152-L154.
+    # https://github.com/google-deepmind/emergent_in_context_learning/blob/eba75a4208b8927cc1e981384a2cc7e014677095/modules/embedding.py#L152-L154
     self.label_embed = LinearTokenEmbed(
       num_classes,
       embed_dim,

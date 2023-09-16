@@ -12,6 +12,8 @@ import jax
 
 
 class Param(metaclass=abc.ABCMeta):
+  """Abstract class for hyperparameters."""
+
   @abc.abstractmethod
   def generate(self, key: KeyArray):
     """Return a value for the hyperparameter."""
@@ -19,46 +21,63 @@ class Param(metaclass=abc.ABCMeta):
 
 
 class FixedParam(Param):
+  """A hyperparameter with a fixed value."""
+
   def __init__(self, value: Any):
+    """Initialize a fixed hyperparameter."""
     super().__init__()
     self._value = value
 
   def __repr__(self):
+    """Return a string representation of the hyperparameter."""
     cls = self.__class__.__name__
     return f"{cls}({self._value})"
 
   def generate(self, key: KeyArray) -> Any:
+    """Return the fixed value of the hyperparameter."""
     del key
     return self._value
 
   def __len__(self) -> int:
+    """Return the length of the hyperparameter."""
     return 1
 
   def __iter__(self) -> Iterator:
+    """Return an iterator over the hyperparameter."""
     yield from [self._value]
 
 
 class EnumParam(Param):
+  """A hyperparameter with a fixed set of values."""
+
   def __init__(self, possible_values: Sequence):
+    """Initialize an enumerated hyperparameter."""
     super().__init__()
     self.possible_values = possible_values
 
   def __repr__(self):
+    """Return a string representation of the hyperparameter."""
     cls = self.__class__.__name__
     return f"{cls}({self.possible_values})"
 
   def generate(self, key: KeyArray) -> Any:
+    """Return a random value from the set of possible values."""
     return self.possible_values[jax.random.choice(key, len(self.possible_values))]
 
   def __len__(self) -> int:
+    """Return the length of the hyperparameter."""
     return len(self.possible_values)
 
   def __iter__(self) -> Iterator:
+    """Return an iterator over the hyperparameter."""
     yield from self.possible_values
 
 
 class UniformParam(Param):
+  """A hyperparameter with a uniform distribution."""
+
   def __init__(self, min_value: float | int, max_value: float | int):
+    """Initialize a uniform hyperparameter."""
     super().__init__()
     if min_value >= max_value:
       raise ValueError(
@@ -73,10 +92,12 @@ class UniformParam(Param):
     self.max_value = max_value
 
   def __repr__(self):
+    """Return a string representation of the hyperparameter."""
     cls = self.__class__.__name__
     return f"{cls}({self.min_value, self.max_value})"
 
   def generate(self, key: KeyArray) -> float | int:
+    """Return a random value from the uniform distribution."""
     return (
       jax.random.randint if isinstance(self.min_value, int) else jax.random.uniform
     )(
@@ -89,7 +110,10 @@ class UniformParam(Param):
 
 
 class LogUniformParam(UniformParam):
+  """A hyperparameter with a log-uniform distribution."""
+
   def __init__(self, min_value: float, max_value: float, base: float = math.e):
+    """Initialize a log-uniform hyperparameter."""
     if type(min_value) != type(max_value):
       raise ValueError(
         "Received conflicting data types: " f"{type(min_value)} != {type(max_value)}"
@@ -113,10 +137,12 @@ class LogUniformParam(UniformParam):
     self.base = base
 
   def __repr__(self):
+    """Return a string representation of the hyperparameter."""
     cls = self.__class__.__name__
     return f"{cls}({self.exp_min_value, self.exp_max_value, self.base})"
 
   def generate(self, key: KeyArray) -> float:
+    """Return a random value from the log-uniform distribution."""
     return (
       np.array(self.base ** super().generate(key))
       .astype(type(self.exp_min_value))

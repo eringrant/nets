@@ -1,3 +1,4 @@
+"""`Sampler`s operating over `Dataset`s."""
 from .base import QueryType
 from .base import Sampler
 from .base import SequenceSampler

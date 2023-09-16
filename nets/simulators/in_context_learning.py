@@ -30,11 +30,13 @@ from nets import models
 
 
 def accuracy(pred_y: Array, y: Array) -> Array:
+  """Compute elementwise accuracy."""
   predicted_class = jnp.argmax(pred_y, axis=-1)
   return predicted_class == y
 
 
 def ce(pred_y: Array, y: Array) -> Array:
+  """Compute elementwise cross-entropy."""
   pred_y = jax.nn.log_softmax(pred_y, axis=-1)
   num_classes = pred_y.shape[-1]
   onehot_y = jax.nn.one_hot(y, num_classes)
@@ -42,13 +44,15 @@ def ce(pred_y: Array, y: Array) -> Array:
 
 
 def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, None]:
-  N = len(sampler)
-  for i in range(0, N, batch_size):
-    yield sampler[i : min(i + batch_size, N)]
+  """Batch a sequence of examples."""
+  n = len(sampler)
+  for i in range(0, n, batch_size):
+    yield sampler[i : min(i + batch_size, n)]
 
 
 @eqx.filter_value_and_grad
 def compute_loss(model: eqx.Module, x: Array, y: Array, key: KeyArray) -> Array:
+  """Compute cross-entropy loss on a single sequence."""
   keys = jax.random.split(key, x.shape[0])
   pred_y = jax.vmap(model)(x, y, key=keys)
   query_ce = ce(pred_y[:, -1, :], y[:, -1])
@@ -64,6 +68,7 @@ def train_step(
   y: Array,
   key: KeyArray,
 ) -> tuple[Array, eqx.Module, Array]:
+  """Train the model on a single sequence."""
   loss, grads = compute_loss(model, x, y, key)
   updates, opt_state = optimizer.update(grads, opt_state)
   model = eqx.apply_updates(model, updates)
@@ -94,11 +99,11 @@ def eval_step(
   closed_class_acc = accuracy(closed_class_pred_y, y)
 
   # Random baseline.
-  C = pred_y.shape[-1]
-  random_baseline = 1.0 / C
+  c = pred_y.shape[-1]
+  random_baseline = 1.0 / c
 
   # Use most frequent class in context as query prediction.
-  support_mode = jax.nn.one_hot(jax.nn.one_hot(y[:-1], C).sum(0).argmax(), C)
+  support_mode = jax.nn.one_hot(jax.nn.one_hot(y[:-1], c).sum(0).argmax(), c)
   support_mode_baseline = accuracy(support_mode, y[-1])
 
   return {
@@ -118,7 +123,7 @@ def eval_step(
 
 
 def summarize_metrics(metrics):
-  """Dual to `eval_step` above."""
+  """Summarize metrics output from `eval_step` for printing."""
   with np.printoptions(precision=2):
     return (
       (
@@ -285,7 +290,8 @@ def simulate(
   evaluations_per_epoch: int,
   evaluate_on_test_split: bool,
   # Dataset params.
-  dataset_cls: type[datasets.Dataset],
+  # TODO(eringrant): Generalize to `datasets.Dataset`.
+  dataset_cls: type[datasets.SymbolicDataset],
   exemplar_labeling: datasets.ExemplarLabeling,
   holdout_class_labeling: datasets.HoldoutClassLabeling,
   num_train_classes: int,
@@ -297,8 +303,9 @@ def simulate(
   num_exemplars_per_class: int,
   exemplar_noise_scale: float,
   # Sampler params.
-  train_sampler_cls: type[samplers.Sampler],
-  eval_sampler_cls: type[samplers.Sampler],
+  # TODO(eringrant): Generalize to `samplers.ClassificationSequenceSampler`.
+  train_sampler_cls: type[samplers.DirichletMultinomialSampler],
+  eval_sampler_cls: type[samplers.DirichletMultinomialSampler],
   train_query_type: samplers.QueryType,
   train_relabeling: bool,
   train_context_len: int,
@@ -306,6 +313,7 @@ def simulate(
   num_train_seqs: int,
   num_eval_seqs: int,
 ) -> tuple[pd.DataFrame, ...]:
+  """Simulate in-context learning of classification tasks."""
   print(f"Using JAX backend: {jax.default_backend()}\n")
 
   print("Using configuration:")
@@ -419,7 +427,7 @@ def simulate(
   opt_state = optimizer.init(eqx.filter(model, eqx.is_array))
 
   # Bookkeeping.
-  metrics = dict.fromkeys(eval_samplers.keys(), [])
+  metrics: dict = dict.fromkeys(eval_samplers.keys(), [])
   itercount = itertools.count()
 
   # Evaluate before starting training.

@@ -1,3 +1,4 @@
+"""Dirichlet-multinomial sequence sampler."""
 from jaxtyping import Array
 from jax.random import KeyArray
 
@@ -14,6 +15,7 @@ from nets.samplers.base import QueryType
 def zipfian_concentration_parameter(
   num_classes: int, concentration_multiplier: float, zipf_exponent: float
 ) -> Array:
+  """Return a Zipfian-parameterized concentration parameter."""
   return zipfian_weights(num_classes, zipf_exponent) * concentration_multiplier
 
 
@@ -94,15 +96,16 @@ class DirichletMultinomialSampler(ClassificationSequenceSampler):
     """Compound Dirichlet-multinomial sequence sampler.
 
     Args:
-      context_len:
+      context_len: The length of the sequence context.
       query_type: A `QueryType` specifying how to generate each sequence's
         query class from (or independently of) the sequence's context elements.
-      concentration_multiplier: The scalar multiplier concentration parameter
-        of the Dirichlet-Multinomial compound distribution; a smaller value
-        increases burstiness.
       zipf_exponent: The exponent of the power law-scaled concentration
         parameter of the Dirichlet-Multinomial compound distribution; a larger
         value increases the skew of the class marginal distribution.
+      concentration_multiplier: The scalar multiplier concentration parameter
+        of the Dirichlet-Multinomial compound distribution; a smaller value
+        increases burstiness.
+      **kwargs: Additional keyword arguments to pass to the base class.
     """
     dirichlet_multinomial_sampler = partial(
       generate_dirichlet_multinomial_sequence,

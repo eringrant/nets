@@ -1,3 +1,4 @@
+"""Submit jobs locally or to a cluster using `submitit`."""
 from typing import Any
 from collections.abc import Callable
 from collections.abc import Iterable
@@ -15,7 +16,7 @@ from tqdm.asyncio import tqdm
 
 import submitit
 
-from nets import simulate
+from nets.simulators.in_context_learning import simulate
 from nets.launch import analyze
 from nets.launch import configs
 
@@ -28,6 +29,8 @@ warnings.filterwarnings("ignore", category=NaturalNameWarning)
 
 
 def augment_df_with_kwargs(func):
+  """Return a function augments a `pd.DataFrame` with keyword arguments."""
+
   def wrapped(**kwargs):
     results_df = func(**kwargs)
     kwargs_df = pd.DataFrame(kwargs, index=(0,))
@@ -37,7 +40,12 @@ def augment_df_with_kwargs(func):
 
 
 class Executor(submitit.AutoExecutor):
-  def starmap_array(self, fn: Callable, iterable: Iterable[Any]) -> list[Any]:
+  """A `submitit.AutoExecutor` with a custom `starmap_array` method."""
+
+  def starmap_array(
+    self, fn: Callable, iterable: Iterable | configs.Config
+  ) -> list[Any]:
+    """A distributed equivalent of the `itertools.starmap` function."""
     submissions = [
       submitit.core.utils.DelayedSubmission(fn, **kwargs) for kwargs in iterable
     ]
@@ -51,6 +59,7 @@ class IndexedAsyncJobProxy(submitit.core.core.AsyncJobProxy):
   """Return the job and the result."""
 
   async def result(self, poll_interval: int | float = 1):
+    """Return the job and the result."""
     await self.wait(poll_interval)
     return self.job, self.job.result()
 
@@ -109,12 +118,13 @@ def get_submitit_executor(
 
 
 def submit_jobs(executor: Executor, cfg: configs.Config):
+  """Submit jobs to the cluster."""
   logging.info(f"Using config {pprint.pformat(cfg)}.")
 
   # Launch jobs.
   logging.info("Launching jobs...")
   jobs = executor.starmap_array(
-    augment_df_with_kwargs(simulate.simulate),
+    augment_df_with_kwargs(simulate),
     cfg,
   )
   logging.info(f"Waiting for {len(jobs)} jobs to terminate...")

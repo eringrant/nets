@@ -1,8 +1,8 @@
 """Configs to pass as `kwargs` to `nets.simulate.in_context_learning`."""
 from typing import Any
 from collections.abc import Mapping
+from itertools import count
 
-from abc import ABC
 from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
@@ -23,7 +23,7 @@ import optax
 # TODO(eringrant): Re-enable grid search if all hyperparameters are enums.
 # TODO(eringrant): Idea: Make `num_configs` required iff hparams are not enums.
 @dataclass(frozen=True, kw_only=True)
-class Config(ABC):
+class Config:
   """Abstract base class for configs."""
 
   key: jax.random.PRNGKey  # Randomness for hyperparameter sampling.
@@ -58,7 +58,16 @@ class Config(ABC):
       )
 
   def __len__(self) -> int:
+    """Return the total number of hyperparameter configurations."""
     return self.num_configs
+
+  def __iter__(self):
+    """Iterate over `self`; needed to appear as `Iterable` to `mypy`."""
+    try:
+      for i in count():
+        yield self[i]
+    except IndexError:
+      return
 
   def __getitem__(self, index: int) -> Mapping[str, Any]:
     """Get the hyperparameter configuration at `index`."""
@@ -108,113 +117,114 @@ class SearchConfig(Config):
   `submitit.Executor.map_array`.
   """
 
-  seed: Param =                     EnumParam(range(0, 3))
+  seed: Param = EnumParam(range(0, 3))
 
   # Model params.
-  embed_dim: Param =                field(init=False)
-  num_heads: Param =                field(init=False)
-  depth: Param =                    field(init=False)
-  mlp_ratio: Param =                field(init=False)
-  causal: Param =                   field(init=False)
+  embed_dim: Param = field(init=False)
+  num_heads: Param = field(init=False)
+  depth: Param = field(init=False)
+  mlp_ratio: Param = field(init=False)
+  causal: Param = field(init=False)
 
   # Training and evaluation params.
-  optimizer_fn: Param =             FixedParam(optax.adam)
-  learning_rate: Param =            FixedParam(1e-3)
-  train_batch_size: Param =         FixedParam(int(32))
-  eval_batch_size: Param =          FixedParam(int(32))
-  num_epochs: Param =               FixedParam(int(1))
-  evaluations_per_epoch: Param =    FixedParam(int(100))
-  evaluate_on_test_split: Param =   FixedParam(False)
+  optimizer_fn: Param = FixedParam(optax.adam)
+  learning_rate: Param = FixedParam(1e-3)
+  train_batch_size: Param = FixedParam(32)
+  eval_batch_size: Param = FixedParam(32)
+  num_epochs: Param = FixedParam(1)
+  evaluations_per_epoch: Param = FixedParam(100)
+  evaluate_on_test_split: Param = FixedParam(False)
 
   # Dataset params.
-  num_train_classes: Param =        field(init=False)  # `init=False` toavoid init
-  num_valid_classes: Param =        field(init=False)  # of to-be-overridden value.
-  num_test_classes: Param =         field(init=False)
-  prop_train_labels: Param =        field(init=False)
-  prop_valid_labels: Param =        field(init=False)
-  prop_test_labels: Param =         field(init=False)
-  dataset_cls: Param =              field(init=False)
-  exemplar_labeling: Param =        field(init=False)
-  holdout_class_labeling: Param =   field(init=False)
-  num_exemplars_per_class: Param =  field(init=False)
-  exemplar_noise_scale: Param =     field(init=False)
+  num_train_classes: Param = field(init=False)  # `init=False` toavoid init
+  num_valid_classes: Param = field(init=False)  # of to-be-overridden value.
+  num_test_classes: Param = field(init=False)
+  prop_train_labels: Param = field(init=False)
+  prop_valid_labels: Param = field(init=False)
+  prop_test_labels: Param = field(init=False)
+  dataset_cls: Param = field(init=False)
+  exemplar_labeling: Param = field(init=False)
+  holdout_class_labeling: Param = field(init=False)
+  num_exemplars_per_class: Param = field(init=False)
+  exemplar_noise_scale: Param = field(init=False)
 
   # Sampler params.
-  num_train_seqs: Param =           field(init=False)
-  num_eval_seqs: Param =            field(init=False)
-  train_sampler_cls: Param =        field(init=False)
-  eval_sampler_cls: Param =         field(init=False)
-  train_query_type: Param =         field(init=False)
-  train_context_len: Param =        field(init=False)
-  train_zipf_exponent: Param =      field(init=False)
-  train_relabeling: Param =         field(init=False)
+  num_train_seqs: Param = field(init=False)
+  num_eval_seqs: Param = field(init=False)
+  train_sampler_cls: Param = field(init=False)
+  eval_sampler_cls: Param = field(init=False)
+  train_query_type: Param = field(init=False)
+  train_context_len: Param = field(init=False)
+  train_zipf_exponent: Param = field(init=False)
+  train_relabeling: Param = field(init=False)
 
 
 @dataclass(frozen=True, kw_only=True)
 class DebugSearchConfig(SearchConfig):
   """Singleton config for debugging."""
 
-  seed: Param =                     FixedParam(0)
+  seed: Param = FixedParam(0)
 
-  num_epochs: Param =               FixedParam(int(0))  # Don't train at all.
-  evaluations_per_epoch: Param =    FixedParam(int(1))
+  num_epochs: Param = FixedParam(0)  # Don't train at all.
+  evaluations_per_epoch: Param = FixedParam(1)
 
-  embed_dim: Param =                FixedParam(int(8))  # Teeny tiny model.
-  num_heads: Param =                FixedParam(int(8))
-  depth: Param =                    FixedParam(int(2))
-  mlp_ratio: Param =                FixedParam(4.0)
-  causal: Param =                   FixedParam(True)
+  embed_dim: Param = FixedParam(8)  # Teeny tiny model.
+  num_heads: Param = FixedParam(8)
+  depth: Param = FixedParam(2)
+  mlp_ratio: Param = FixedParam(4.0)
+  causal: Param = FixedParam(True)
 
-  num_train_classes: Param =        FixedParam(int(80))
-  num_valid_classes: Param =        FixedParam(int(20))
-  num_test_classes: Param =         FixedParam(int(16))
-  prop_train_labels: Param =        FixedParam(.8)
-  prop_valid_labels: Param =        FixedParam(.7)
-  prop_test_labels: Param =         FixedParam(0.3)
-  dataset_cls: Param =              FixedParam(datasets.SymbolicDataset)
-  exemplar_labeling: Param =        FixedParam(datasets.ExemplarLabeling.STANDARD)
-  holdout_class_labeling: Param =   FixedParam(datasets.HoldoutClassLabeling.STANDARD)
-  num_exemplars_per_class: Param =  FixedParam(int(20))
-  exemplar_noise_scale: Param =     FixedParam(1.0)
+  num_train_classes: Param = FixedParam(80)
+  num_valid_classes: Param = FixedParam(20)
+  num_test_classes: Param = FixedParam(16)
+  prop_train_labels: Param = FixedParam(0.8)
+  prop_valid_labels: Param = FixedParam(0.7)
+  prop_test_labels: Param = FixedParam(0.3)
+  dataset_cls: Param = FixedParam(datasets.SymbolicDataset)
+  exemplar_labeling: Param = FixedParam(datasets.ExemplarLabeling.STANDARD)
+  holdout_class_labeling: Param = FixedParam(datasets.HoldoutClassLabeling.STANDARD)
+  num_exemplars_per_class: Param = FixedParam(20)
+  exemplar_noise_scale: Param = FixedParam(1.0)
 
-  num_train_seqs: Param =           FixedParam(int(1e3))  # Small number
-  num_eval_seqs: Param =            FixedParam(int(1e2))  # of sequences.
-  train_sampler_cls: Param =        FixedParam(samplers.DirichletMultinomialSampler)
-  eval_sampler_cls: Param =         FixedParam(samplers.DirichletMultinomialSampler)
-  train_query_type: Param =         FixedParam(samplers.QueryType.SUPPORTED)
-  train_context_len: Param =        FixedParam(int(2))
-  train_zipf_exponent: Param =      FixedParam(1.0)
-  train_relabeling: Param =         FixedParam(False)
+  num_train_seqs: Param = FixedParam(int(1e3))  # Small number
+  num_eval_seqs: Param = FixedParam(int(1e2))  # of sequences.
+  train_sampler_cls: Param = FixedParam(samplers.DirichletMultinomialSampler)
+  eval_sampler_cls: Param = FixedParam(samplers.DirichletMultinomialSampler)
+  train_query_type: Param = FixedParam(samplers.QueryType.SUPPORTED)
+  train_context_len: Param = FixedParam(2)
+  train_zipf_exponent: Param = FixedParam(1.0)
+  train_relabeling: Param = FixedParam(False)
 
 
 @dataclass(frozen=True, kw_only=True)
 class SymbolicSearchConfig(SearchConfig):
   """Singleton hyperparameter search for the symbolic dataset."""
-  evaluations_per_epoch: Param =    FixedParam(int(100))
 
-  embed_dim: Param =                FixedParam(int(64))
-  num_heads: Param =                FixedParam(int(8))
-  depth: Param =                    FixedParam(int(2))
-  mlp_ratio: Param =                FixedParam(4.0)
-  causal: Param =                   FixedParam(True)
+  evaluations_per_epoch: Param = FixedParam(100)
 
-  num_train_classes: Param =        FixedParam(int(1600))
-  num_valid_classes: Param =        FixedParam(int(2))
-  num_test_classes: Param =         FixedParam(int(2))
-  prop_train_labels: Param =        FixedParam(1.0)
-  prop_valid_labels: Param =        FixedParam(1.0)
-  prop_test_labels: Param =         FixedParam(1.0)
-  dataset_cls: Param =              FixedParam(datasets.SymbolicDataset)
-  exemplar_labeling: Param =        FixedParam(datasets.ExemplarLabeling.STANDARD)
-  holdout_class_labeling: Param =   FixedParam(datasets.HoldoutClassLabeling.TRAIN_LABELS)
-  num_exemplars_per_class: Param =  FixedParam(int(20))
-  exemplar_noise_scale: Param =     FixedParam(0.1)
+  embed_dim: Param = FixedParam(64)
+  num_heads: Param = FixedParam(8)
+  depth: Param = FixedParam(2)
+  mlp_ratio: Param = FixedParam(4.0)
+  causal: Param = FixedParam(True)
 
-  num_train_seqs: Param =           FixedParam(int(1e5 * 32))
-  num_eval_seqs: Param =            FixedParam(int(1e2 * 32))
-  train_sampler_cls: Param =        FixedParam(samplers.DirichletMultinomialSampler)
-  eval_sampler_cls: Param =         FixedParam(samplers.DirichletMultinomialSampler)
-  train_query_type: Param =         FixedParam(samplers.QueryType.SUPPORTED)
-  train_context_len: Param =        FixedParam(int(2))
-  train_zipf_exponent: Param =      FixedParam(1.0)
-  train_relabeling: Param =         FixedParam(True)
+  num_train_classes: Param = FixedParam(1600)
+  num_valid_classes: Param = FixedParam(2)
+  num_test_classes: Param = FixedParam(2)
+  prop_train_labels: Param = FixedParam(1.0)
+  prop_valid_labels: Param = FixedParam(1.0)
+  prop_test_labels: Param = FixedParam(1.0)
+  dataset_cls: Param = FixedParam(datasets.SymbolicDataset)
+  exemplar_labeling: Param = FixedParam(datasets.ExemplarLabeling.STANDARD)
+  holdout_class_labeling: Param = FixedParam(datasets.HoldoutClassLabeling.TRAIN_LABELS)
+  num_exemplars_per_class: Param = FixedParam(20)
+  exemplar_noise_scale: Param = FixedParam(0.1)
+
+  num_train_seqs: Param = FixedParam(int(1e5 * 32))
+  num_eval_seqs: Param = FixedParam(int(1e2 * 32))
+  train_sampler_cls: Param = FixedParam(samplers.DirichletMultinomialSampler)
+  eval_sampler_cls: Param = FixedParam(samplers.DirichletMultinomialSampler)
+  train_query_type: Param = FixedParam(samplers.QueryType.SUPPORTED)
+  train_context_len: Param = FixedParam(2)
+  train_zipf_exponent: Param = FixedParam(1.0)
+  train_relabeling: Param = FixedParam(True)

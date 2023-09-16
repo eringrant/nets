@@ -1,3 +1,4 @@
+"""A `SymbolicDataset` of class exemplars from which to draw sequences."""
 from jax.random import KeyArray
 
 from functools import partial
@@ -15,14 +16,17 @@ from nets.datasets.base import HoldoutClassLabeling
 
 
 class SymbolicDataset(Dataset):
+  """A `SymbolicDataset` of class exemplars from which to draw sequences."""
+
   _exemplars: np.ndarray
   _labels: np.ndarray
+
   num_train_classes: int
-  num_valid_classes: int
+  prop_train_labels: int
+  prop_test_labels: int
   num_test_classes: int
-  num_train_labels: int
-  num_valid_labels: int
-  num_test_labels: int
+  num_valid_classes: int
+  prop_valid_labels: int
 
   def __init__(
     self,
@@ -42,7 +46,27 @@ class SymbolicDataset(Dataset):
     """A `SymbolicDataset` of class exemplars from which to draw sequences.
 
     Args:
-      ...`Dataset` args...
+      key: A key for randomness in sampling.
+      split: Which split of the underlying dataset to use.
+      exemplar_labeling: How to assign class labels to exemplars from the underlying
+          dataset.
+      holdout_class_labeling: How to assign class labels to holdout (validation and
+          testing) splits of this `Dataset`.
+      num_train_classes: Number of training classes in this `Dataset`.
+      prop_train_labels: Size of the training label set proportional to the underlying
+          class set. If 1.0, then labels are identical to the underlying class labels;
+          if < 1.0, then labels are wrapped in increasing order.
+      num_valid_classes: Number of validation classes in this `Dataset`.
+      prop_valid_labels: Size of the validation label set proportional to the
+          underlying class set. If 1.0, then labels are identical to the underlying
+          class labels; if < 1.0, then labels are wrapped in increasing order.
+      num_test_classes: Number of testing classes in this `Dataset`.
+      prop_test_labels: Size of the testing label set proportional to the underlying
+          class set. If 1.0, then labels are identical to the underlying class labels;
+          if < 1.0, then labels are wrapped in increasing order.
+      num_exemplars_per_class: Number of exemplars per class to draw from the
+          underlying dataset.
+      exemplar_noise_scale: Scale of the noise to add to exemplars.
     """
     super().__init__(
       key=key,
@@ -56,8 +80,9 @@ class SymbolicDataset(Dataset):
       num_valid_classes=num_valid_classes,
       prop_valid_labels=prop_valid_labels,
       num_exemplars_per_class=num_exemplars_per_class,
-      exemplar_noise_scale=exemplar_noise_scale,
     )
+
+    self.exemplar_noise_scale = exemplar_noise_scale
 
     # Exemplar generation for `SymbolicDataset`.
     labels = np.arange(self.num_classes)
@@ -92,9 +117,11 @@ class SymbolicDataset(Dataset):
 
   @property
   def exemplar_shape(self) -> tuple[int]:
+    """Shape of an exemplar."""
     return (self.num_classes,)
 
   def __getitem__(self, index: int | slice) -> ExemplarType:
+    """Get the exemplar(s) and the corresponding label(s) at `index`."""
     labels = self._labels[index]
     onehot_labels = jnn.one_hot(labels, self.num_classes)
 
@@ -104,9 +131,8 @@ class SymbolicDataset(Dataset):
     else:
       exemplar_key = self._exemplar_keys[index]
 
-      # TODO(eringrant): Deal with other `index` shapes.
       if isinstance(index, int):
-        exemplar_key = jnp.expand_dims(exemplar_key, 0)  # type: ignore[arg-type]
+        exemplar_key = jnp.expand_dims(exemplar_key, 0)
 
       exemplars = self.generate_exemplar(
         key=exemplar_key,

@@ -1,7 +1,6 @@
 """`Dataset`s are sequences of unique examples."""
 from typing import Any
 from collections.abc import Sequence
-from typing import Union
 from nptyping import NDArray
 from nptyping import Bool
 from nptyping import Floating
@@ -22,12 +21,14 @@ import jax.nn as jnn
 
 
 # Type hints.
-IndexType = Union[int, Sequence[int], slice]
+IndexType = int | Sequence[int] | slice
 ExemplarType = tuple[NDArray[Any, Floating], NDArray[Any, Int]]
 
 
 @unique
 class ExemplarLabeling(Enum):
+  """How to assign class labels to exemplars from the underlying dataset."""
+
   # Use the original labels from the dataset.
   STANDARD = 1
   # Remove all but the first exemplar from each class.
@@ -39,6 +40,8 @@ class ExemplarLabeling(Enum):
 
 @unique
 class HoldoutClassLabeling(Enum):
+  """How to assign class labels to holdout (validation and testing) splits."""
+
   # Use the original labels from the dataset.
   STANDARD = 1
   # Relabel validation and test classes with labels from the training set.
@@ -47,6 +50,8 @@ class HoldoutClassLabeling(Enum):
 
 @unique
 class DatasetSplit(Enum):
+  """Which split of the underlying dataset to use."""
+
   TRAIN = 1
   VALID = 2
   TEST = 3
@@ -54,6 +59,7 @@ class DatasetSplit(Enum):
 
 
 def wrap_labels(labels: Array, num_classes: int, modulus: Array) -> Array:
+  """Wrap `num_classes` into `labels`."""
   onehot_labels = jnn.one_hot(labels, num_classes)
   return (onehot_labels @ modulus).argmax(axis=-1)
 
@@ -73,6 +79,8 @@ def get_wrapped_indices(
 
 
 class Dataset:
+  """A `Dataset` of class exemplars from which to draw sequences."""
+
   _exemplars: Sequence[Path] | NDArray
   _labels: NDArray
 
@@ -96,33 +104,35 @@ class Dataset:
     num_valid_classes: int = 0,
     prop_valid_labels: float = 0,
     num_exemplars_per_class: int = 400,
-    exemplar_noise_scale: float = 1e-2,
   ):
     """A `Dataset` of class exemplars from which to draw sequences.
 
     Args:
       key: A key for randomness in sampling.
       split: Which split of the underlying dataset to use.
-      exemplar_labeling: How to assign class labels to exemplars from the
-        underlying dataset (reproduction of
-        https://github.com/deepmind/emergent_in_context_learning/blob/main/datasets/data_generators.py#L60-L65).
-      holdout_class_labeling: How to assign class labels to holdout
-        (validation and testing) splits of this `Dataset`.
-      num_{train,test,valid}_classes: Number of {training, testing, validation}
-        classes in this `Dataset`.
-      prop_{train,test,valid}_labels: Size of the {training, testing,
-        validation} label set proportional to the underlying class set. If 1.0,
-        then labels are identical to the underlying class labels; if < 1.0,
-        then labels are wrapped in increasing order.
+      exemplar_labeling: How to assign class labels to exemplars from the underlying
+          dataset.
+      holdout_class_labeling: How to assign class labels to holdout (validation and
+          testing) splits of this `Dataset`.
+      num_train_classes: Number of training classes in this `Dataset`.
+      prop_train_labels: Size of the training label set proportional to the underlying
+          class set. If 1.0, then labels are identical to the underlying class labels;
+          if < 1.0, then labels are wrapped in increasing order.
+      num_valid_classes: Number of validation classes in this `Dataset`.
+      prop_valid_labels: Size of the validation label set proportional to the
+          underlying class set. If 1.0, then labels are identical to the underlying
+          class labels; if < 1.0, then labels are wrapped in increasing order.
+      num_test_classes: Number of testing classes in this `Dataset`.
+      prop_test_labels: Size of the testing label set proportional to the underlying
+          class set. If 1.0, then labels are identical to the underlying class labels;
+          if < 1.0, then labels are wrapped in increasing order.
       num_exemplars_per_class: Number of exemplars per class to draw from the
-        underlying dataset.
-      exemplar_noise_scale: The scale of noise to add to each additional exemplar.
+          underlying dataset.
     """
     self.num_train_classes = num_train_classes
     self.num_valid_classes = num_valid_classes
     self.num_test_classes = num_test_classes
     self.num_exemplars_per_class = num_exemplars_per_class
-    self.exemplar_noise_scale = exemplar_noise_scale
 
     if holdout_class_labeling == HoldoutClassLabeling.TRAIN_LABELS:
       if (
@@ -191,17 +201,21 @@ class Dataset:
     )
 
   def __len__(self) -> int:
+    """Number of exemplars in this `Dataset`."""
     return len(self._exemplars)
 
   @property
   def num_classes(self) -> int:
+    """Number of classes in this `Dataset`."""
     return self.num_train_classes + self.num_valid_classes + self.num_test_classes
 
   @property
   def exemplar_shape(self) -> tuple[int]:
+    """Shape of an exemplar."""
     raise NotImplementedError("To be implemented by the subclass.")
 
   def __getitem__(self, index: int | slice) -> ExemplarType:
+    """Get the exemplar(s) and the corresponding label(s) at `index`."""
     raise NotImplementedError("To be implemented by the subclass.")
 
   @cached_property
@@ -211,17 +225,20 @@ class Dataset:
 
   @cached_property
   def train_classes(self) -> Sequence[int]:
+    """Deterministic ordering of training class labels."""
     i = self.num_train_classes
     return self.unique_classes[:i]
 
   @cached_property
   def valid_classes(self) -> Sequence[int]:
+    """Deterministic ordering of validation class labels."""
     i = self.num_train_classes
     j = self.num_train_classes + self.num_valid_classes
     return self.unique_classes[i:j]
 
   @cached_property
   def test_classes(self) -> Sequence[int]:
+    """Deterministic ordering of testing class labels."""
     j = self.num_train_classes + self.num_valid_classes
     k = self.num_train_classes + self.num_valid_classes + self.num_test_classes
     return self.unique_classes[j:k]

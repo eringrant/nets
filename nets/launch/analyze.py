@@ -1,3 +1,4 @@
+"""Utilities for analyzing results."""
 import dill as pickle
 import logging
 import os
@@ -22,6 +23,7 @@ ELEMENT_IDENTIFIER_HPARAMS = (
 
 
 def compress_df(df: pd.DataFrame) -> pd.DataFrame:
+  """Compress `df` by optimizing data types."""
   for col in df.select_dtypes("category"):
     if df[col].dtype.categories.dtype is np.dtype("object"):
       df[col] = df[col].map(str)
@@ -66,8 +68,8 @@ def postprocess_result(result: pd.DataFrame, cfg: configs.Config) -> pd.DataFram
       categories[field.name] = CategoricalDtype(categories=param, ordered=True)
 
   # Optimize data types.
-  for field in categories:
-    result[field] = result[field].astype(categories[field])
+  for field_name in categories:
+    result[field_name] = result[field_name].astype(categories[field_name])
   result = compress_df(result)
   if result.isnull().values.any():
     raise ValueError("Failed to cast.")
@@ -86,6 +88,7 @@ def truncate(df, col: str, n: int = int(1e2 * 32)):
 
 
 def load_result_from_pkl(filepath):
+  """Load result from `filepath`."""
   if filepath is None:
     return None
   else:
@@ -151,6 +154,7 @@ def pd_categorical_concat(df1, df2):
 
 # TODO(eringrant): Generalize to arbitrary #s.
 def read_concat_hdf(f1, f2):
+  """Read and concatenate two HDFs."""
   ignore_columns = (
     "optimizer_fn",
     "learning_rate",

@@ -1,3 +1,4 @@
+"""`Dataset`s to accompany models."""
 from .base import DatasetSplit
 from .base import ExemplarLabeling
 from .base import HoldoutClassLabeling
