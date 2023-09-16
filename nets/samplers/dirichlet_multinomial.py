@@ -1,9 +1,6 @@
-from typing import Generator
-from typing import Sequence
 from jaxtyping import Array
 from jax.random import KeyArray
 
-from itertools import count
 from functools import partial
 
 import jax

@@ -4,16 +4,13 @@
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 
-from typing import Callable
-from typing import Mapping
-from typing import Sequence
-from typing import Generator
-from typing import Union
-from typing import Tuple
+from collections.abc import Callable
+from collections.abc import Mapping
+from collections.abc import Sequence
+from collections.abc import Generator
 from jaxtyping import Array
 from jax.random import KeyArray
 
-import logging
 import itertools
 from functools import partial
 import pprint
@@ -66,7 +63,7 @@ def train_step(
   x: Array,
   y: Array,
   key: KeyArray,
-) -> Tuple[Array, eqx.Module, Array]:
+) -> tuple[Array, eqx.Module, Array]:
   loss, grads = compute_loss(model, x, y, key)
   updates, opt_state = optimizer.update(grads, opt_state)
   model = eqx.apply_updates(model, updates)
@@ -220,7 +217,6 @@ def evaluate(
   batch_size: int,
 ) -> pd.DataFrame:
   """Convenience function to evaluate `model` on batches from `sampler`."""
-
   metrics = {}
 
   ### Metrics metadata.
@@ -282,7 +278,7 @@ def simulate(
   mlp_ratio: float,
   # Training and evaluation params.
   optimizer_fn: Callable,  # TODO(eringrant): Define interface.
-  learning_rate: Union[float, Callable],  # TODO(eringrant): Define interface.
+  learning_rate: float | Callable,  # TODO(eringrant): Define interface.
   train_batch_size: int,
   eval_batch_size: int,
   num_epochs: int,
@@ -309,7 +305,7 @@ def simulate(
   train_zipf_exponent: float,
   num_train_seqs: int,
   num_eval_seqs: int,
-) -> Tuple[pd.DataFrame, ...]:
+) -> tuple[pd.DataFrame, ...]:
   print(f"Using JAX backend: {jax.default_backend()}\n")
 
   print("Using configuration:")

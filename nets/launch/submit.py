@@ -1,10 +1,7 @@
 from typing import Any
-from typing import Callable
-from typing import Iterable
-from typing import List
+from collections.abc import Callable
+from collections.abc import Iterable
 from typing import Literal
-from typing import Optional
-from typing import Union
 
 import asyncio
 import datetime
@@ -40,10 +37,9 @@ def augment_df_with_kwargs(func):
 
 
 class Executor(submitit.AutoExecutor):
-  def starmap_array(self, fn: Callable, iterable: Iterable[Any]) -> List[Any]:
+  def starmap_array(self, fn: Callable, iterable: Iterable[Any]) -> list[Any]:
     submissions = [
-      submitit.core.utils.DelayedSubmission(fn, **kwargs) 
-      for kwargs in iterable
+      submitit.core.utils.DelayedSubmission(fn, **kwargs) for kwargs in iterable
     ]
     if len(submissions) == 0:
       print("Received an empty job array")
@@ -54,7 +50,7 @@ class Executor(submitit.AutoExecutor):
 class IndexedAsyncJobProxy(submitit.core.core.AsyncJobProxy):
   """Return the job and the result."""
 
-  async def result(self, poll_interval: Union[int, float] = 1):
+  async def result(self, poll_interval: int | float = 1):
     await self.wait(poll_interval)
     return self.job, self.job.result()
 
@@ -66,18 +62,17 @@ def get_timestamp():
 
 def get_submitit_executor(
   cluster: Literal["slurm", "local", "debug"],
-  log_dir: Union[str, Path],
+  log_dir: str | Path,
   timeout_min: int = 60,
   gpus_per_node: int = 1,
   cpus_per_task: int = 1,
   nodes: int = 1,
   mem_gb: int = 16,
-  slurm_partition: Optional[Literal["debug", "cpu", "gpu"]] = None,
-  slurm_parallelism: Optional[int] = None,
-  slurm_exclude: Optional[int] = None,
+  slurm_partition: Literal["debug", "cpu", "gpu"] | None = None,
+  slurm_parallelism: int | None = None,
+  slurm_exclude: int | None = None,
 ) -> submitit.Executor:
   """Return a `submitit.Executor` with the given parameters."""
-
   if gpus_per_node > 4:
     raise ValueError("The cluster has no more than 4 GPUs per node.")
 

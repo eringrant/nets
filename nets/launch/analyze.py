@@ -1,13 +1,9 @@
-from typing import Iterable
-from typing import Union
-
 import dill as pickle
 import logging
 import os
 from pathlib import Path
 
 from dataclasses import fields
-from itertools import starmap
 import numpy as np
 import pandas as pd
 from pandas.api.types import CategoricalDtype
@@ -26,7 +22,7 @@ ELEMENT_IDENTIFIER_HPARAMS = (
 
 
 def compress_df(df: pd.DataFrame) -> pd.DataFrame:
-  for col in df.select_dtypes(("category")):
+  for col in df.select_dtypes("category"):
     if df[col].dtype.categories.dtype is np.dtype("object"):
       df[col] = df[col].map(str)
 
@@ -61,13 +57,12 @@ def compress_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def postprocess_result(result: pd.DataFrame, cfg: configs.Config) -> pd.DataFrame:
   """Postprocess `result` using hyperparameter search space in `cfg`."""
-
   categories = {}
   for field in fields(cfg):
     param = getattr(cfg, field.name)
     if field.name == "key" or field.name == "num_configs":
       continue
-    if isinstance(param, (hparams.EnumParam, hparams.FixedParam)):
+    if isinstance(param, hparams.EnumParam | hparams.FixedParam):
       categories[field.name] = CategoricalDtype(categories=param, ordered=True)
 
   # Optimize data types.
@@ -78,7 +73,7 @@ def postprocess_result(result: pd.DataFrame, cfg: configs.Config) -> pd.DataFram
     raise ValueError("Failed to cast.")
 
   # Drop constant columns to save memory.
-  for col in result.select_dtypes(("category")):
+  for col in result.select_dtypes("category"):
     if len(result[col].cat.categories) == 1:
       result.drop(col, inplace=True, axis=1)
 
@@ -104,12 +99,11 @@ def load_result_from_pkl(filepath):
 
 
 def save_result(
-  job_path: Union[str, Path],
+  job_path: str | Path,
   results: pd.DataFrame,
   result_filename: str = "result",
-) -> Union[str, Path]:
+) -> str | Path:
   """Save `result` at `job_path`."""
-
   logging.info("Saving results...")
   results_path = os.path.join(job_path, f"{result_filename}.h5")
   results.to_hdf(
@@ -157,7 +151,6 @@ def pd_categorical_concat(df1, df2):
 
 # TODO(eringrant): Generalize to arbitrary #s.
 def read_concat_hdf(f1, f2):
-
   ignore_columns = (
     "optimizer_fn",
     "learning_rate",

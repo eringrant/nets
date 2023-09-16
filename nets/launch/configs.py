@@ -1,6 +1,6 @@
 """Configs to pass as `kwargs` to `nets.simulate.in_context_learning`."""
 from typing import Any
-from typing import Mapping
+from collections.abc import Mapping
 
 from abc import ABC
 from dataclasses import asdict
@@ -11,13 +11,10 @@ from dataclasses import fields
 from nets.launch.hparams import Param
 from nets.launch.hparams import FixedParam
 from nets.launch.hparams import EnumParam
-from nets.launch.hparams import UniformParam
-from nets.launch.hparams import LogUniformParam
 
 from nets import datasets
 from nets import samplers
 
-import equinox as eqx
 import numpy as np
 import jax
 import optax
@@ -34,7 +31,6 @@ class Config(ABC):
 
   def __post_init__(self):
     """Check that types are as expected after initialization."""
-
     num_unique_configs = 1
 
     for field_ in fields(self):

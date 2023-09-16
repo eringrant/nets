@@ -18,15 +18,12 @@ import equinox.nn as enn
 
 from jaxtyping import Array
 from jax.random import KeyArray
-from typing import Callable
-from typing import Optional
-from typing import Sequence
-from typing import Tuple
-from typing import Union
+from collections.abc import Callable
+from collections.abc import Sequence
 
 
 def trunc_normal_init(
-  weight: Array, key: KeyArray, stddev: Optional[float] = None
+  weight: Array, key: KeyArray, stddev: float | None = None
 ) -> Array:
   _, in_ = weight.shape
   stddev = stddev or sqrt(1.0 / max(1.0, in_))
@@ -39,7 +36,7 @@ def trunc_normal_init(
 
 
 def lecun_normal_init(
-  weight: Array, key: KeyArray, scale: Optional[float] = None
+  weight: Array, key: KeyArray, scale: float | None = None
 ) -> Array:
   """Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py."""
   _, in_ = weight.shape
@@ -72,7 +69,7 @@ class Linear(enn.Linear):
     trainable: bool = True,
     *,
     key: KeyArray,
-    init_scale: Optional[float] = 1.0,
+    init_scale: float | None = 1.0,
   ):
     super().__init__(
       in_features=in_features,
@@ -105,9 +102,9 @@ class LinearTokenEmbed(enn.Linear, TokenEmbed):
 
   def __init__(
     self,
-    input_shape: Union[int, Sequence[int]],
+    input_shape: int | Sequence[int],
     embedding_size: int,
-    init_stddev: Optional[float] = 1.0,
+    init_stddev: float | None = 1.0,
     trainable: bool = True,
     *,
     key: KeyArray,
@@ -148,7 +145,7 @@ class LinearPosEmbed(enn.Embedding, PosEmbed):
       key=key,
     )
 
-  def __call__(self, x: Array, *, key: Optional[KeyArray] = None) -> Array:
+  def __call__(self, x: Array, *, key: KeyArray | None = None) -> Array:
     """Pad sequence to max length for compatibility with the weight matrix."""
     pad_size = self.num_embeddings - x.size
     return super().__call__(jnp.pad(x, (0, pad_size), "constant"))
@@ -175,9 +172,8 @@ class SinusoidalPosEmbed(enn.Embedding, PosEmbed):
     - `embedding_size`: Size of each embedding vector.
     - `max_time`: Position scaling factor.
     - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter
-        initialisation. (Keyword only argument.)
+        initialisation. (Keyword only argument.).
     """
-
     if embedding_size % 2 == 1:
       raise ValueError("Embedding size must be even if using sinusoidal encoding.")
 
@@ -212,10 +208,10 @@ class MLPBlock(eqx.Module):
   def __init__(
     self,
     in_features: int,
-    hidden_features: Optional[int] = None,
-    out_features: Optional[int] = None,
+    hidden_features: int | None = None,
+    out_features: int | None = None,
     act: Callable = lambda x: x,
-    drop: Union[float, Tuple[float]] = 0.0,
+    drop: float | tuple[float] = 0.0,
     *,
     key: KeyArray = None,
   ):
@@ -272,7 +268,7 @@ class AttentionBlock(eqx.Module):
     num_heads: int,
     causal: bool,
     qkv_bias: bool = False,
-    qk_scale: Optional[float] = None,
+    qk_scale: float | None = None,
     attn_drop: float = 0.0,
     proj_drop: float = 0.0,
     *,
@@ -290,7 +286,6 @@ class AttentionBlock(eqx.Module):
     - `proj_drop`: Dropout rate for projection.
     - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter initialisation.
     """
-
     super().__init__()
     keys = jrandom.split(key, 2)
     self.num_heads = num_heads
@@ -334,24 +329,24 @@ class AttentionBlock(eqx.Module):
 class TransformerBlock(eqx.Module):
   """TODO."""
 
-  mlp_ratio: Optional[float]
+  mlp_ratio: float | None
 
   norm1: eqx.Module
   attn: AttentionBlock
   drop_path1: enn.Dropout
 
-  norm2: Optional[eqx.Module]
-  mlp: Optional[MLPBlock]
-  drop_path2: Optional[enn.Dropout]
+  norm2: eqx.Module | None
+  mlp: MLPBlock | None
+  drop_path2: enn.Dropout | None
 
   def __init__(
     self,
     dim: int,
     num_heads: int,
     causal: bool,
-    mlp_ratio: Optional[float] = 4.0,
+    mlp_ratio: float | None = 4.0,
     qkv_bias: bool = False,
-    qk_scale: Optional[float] = None,
+    qk_scale: float | None = None,
     mlp_drop: float = 0.0,
     attn_drop: float = 0.0,
     proj_drop: float = 0.0,
@@ -441,14 +436,14 @@ class Transformer(eqx.Module):
 
   def __init__(
     self,
-    num_classes: Optional[int],
+    num_classes: int | None,
     embed_dim: int,
     depth: int,
     num_heads: int,
     causal: bool,
-    mlp_ratio: Optional[float] = 4.0,
+    mlp_ratio: float | None = 4.0,
     qkv_bias: bool = True,
-    qk_scale: Optional[float] = None,
+    qk_scale: float | None = None,
     tok_embed_drop_rate: float = 0.0,
     pos_embed_drop_rate: float = 0.0,
     mlp_drop_rate: float = 0.0,
@@ -552,7 +547,7 @@ class SequenceClassifier(eqx.Module):
 
   def __init__(
     self,
-    example_shape: Tuple[int],
+    example_shape: tuple[int],
     num_classes: int,
     embed_dim: int,
     train_embed: bool = True,

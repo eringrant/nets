@@ -1,5 +1,3 @@
-from typing import Tuple
-from typing import Union
 from jax.random import KeyArray
 
 from functools import partial
@@ -17,7 +15,6 @@ from nets.datasets.base import HoldoutClassLabeling
 
 
 class SymbolicDataset(Dataset):
-
   _exemplars: np.ndarray
   _labels: np.ndarray
   num_train_classes: int
@@ -94,10 +91,10 @@ class SymbolicDataset(Dataset):
       )
 
   @property
-  def exemplar_shape(self) -> Tuple[int]:
+  def exemplar_shape(self) -> tuple[int]:
     return (self.num_classes,)
 
-  def __getitem__(self, index: Union[int, slice]) -> ExemplarType:
+  def __getitem__(self, index: int | slice) -> ExemplarType:
     labels = self._labels[index]
     onehot_labels = jnn.one_hot(labels, self.num_classes)
 

@@ -1,11 +1,8 @@
 """`Sampler`s are sequences of samples from a `Dataset`."""
 from __future__ import annotations
 
-from typing import Optional
-from typing import Sequence
-from typing import Union
+from collections.abc import Sequence
 from typing_extensions import Protocol
-from nptyping import NDArray
 from jaxtyping import Array
 from jax.random import KeyArray
 from nets.datasets.base import ExemplarType
@@ -67,7 +64,6 @@ def generate_exemplar_idx_sequence(
     An array of indices into `dataset_labels` corresponding to sampled
     exemplars.
   """
-
   # Identify valid class exemplars for each element of the sequence
   # via a [context_len + 1, dataset_len] mask.
   exemplar_mask_seq = jnn.one_hot(
@@ -169,7 +165,7 @@ class ClassificationSequenceSampler(SequenceSampler):
     exemplar_split: DatasetSplit,
     class_idx_sequence_sampler: ClassSampler,
     relabel_sequences: bool = False,
-    num_seqs: Optional[int] = None,
+    num_seqs: int | None = None,
   ):
     """Sampler of sequences of example-label pairs.
 
@@ -188,7 +184,6 @@ class ClassificationSequenceSampler(SequenceSampler):
         `class_idx_sequence_sampler`. If `None`, sample an infinite sequence of
         sequences.
     """
-
     # The classes to sample from are determined by the dataset split.
     if class_split == DatasetSplit.ALL:
       dataset_classes = dataset.unique_classes
@@ -241,7 +236,7 @@ class ClassificationSequenceSampler(SequenceSampler):
       raise AttributeError("An infinite sequence does not have finite length.")
     return self.num_seqs
 
-  def __getitem__(self, index: Union[int, slice]) -> ExemplarType:
+  def __getitem__(self, index: int | slice) -> ExemplarType:
     """Return exemplar-class pairs for the sequence at `index` of `Sampler`."""
     if isinstance(index, int):
       index_max = index

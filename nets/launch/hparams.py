@@ -1,8 +1,7 @@
 """Hyperparameter searches."""
 from typing import Any
-from typing import Iterator
-from typing import Sequence
-from typing import Union
+from collections.abc import Iterator
+from collections.abc import Sequence
 from jax.random import KeyArray
 
 import abc
@@ -59,7 +58,7 @@ class EnumParam(Param):
 
 
 class UniformParam(Param):
-  def __init__(self, min_value: Union[float, int], max_value: Union[float, int]):
+  def __init__(self, min_value: float | int, max_value: float | int):
     super().__init__()
     if min_value >= max_value:
       raise ValueError(
@@ -77,7 +76,7 @@ class UniformParam(Param):
     cls = self.__class__.__name__
     return f"{cls}({self.min_value, self.max_value})"
 
-  def generate(self, key: KeyArray) -> Union[float, int]:
+  def generate(self, key: KeyArray) -> float | int:
     return (
       jax.random.randint if isinstance(self.min_value, int) else jax.random.uniform
     )(

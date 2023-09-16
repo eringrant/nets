@@ -1,7 +1,6 @@
 """`Dataset`s are sequences of unique examples."""
 from typing import Any
-from typing import Sequence
-from typing import Tuple
+from collections.abc import Sequence
 from typing import Union
 from nptyping import NDArray
 from nptyping import Bool
@@ -24,7 +23,7 @@ import jax.nn as jnn
 
 # Type hints.
 IndexType = Union[int, Sequence[int], slice]
-ExemplarType = Tuple[NDArray[Any, Floating], NDArray[Any, Int]]
+ExemplarType = tuple[NDArray[Any, Floating], NDArray[Any, Int]]
 
 
 @unique
@@ -61,7 +60,7 @@ def wrap_labels(labels: Array, num_classes: int, modulus: Array) -> Array:
 
 def get_wrapped_indices(
   prop_labels: float, num_classes: int, offset=0
-) -> Tuple[int, Array]:
+) -> tuple[int, Array]:
   """Get indices to wrap `num_classes` into `prop_labels` labels."""
   if prop_labels < 1.0:
     num_labels = int(prop_labels * num_classes)
@@ -74,8 +73,7 @@ def get_wrapped_indices(
 
 
 class Dataset:
-
-  _exemplars: Union[Sequence[Path], NDArray]
+  _exemplars: Sequence[Path] | NDArray
   _labels: NDArray
 
   num_train_classes: int
@@ -120,7 +118,6 @@ class Dataset:
         underlying dataset.
       exemplar_noise_scale: The scale of noise to add to each additional exemplar.
     """
-
     self.num_train_classes = num_train_classes
     self.num_valid_classes = num_valid_classes
     self.num_test_classes = num_test_classes
@@ -201,10 +198,10 @@ class Dataset:
     return self.num_train_classes + self.num_valid_classes + self.num_test_classes
 
   @property
-  def exemplar_shape(self) -> Tuple[int]:
+  def exemplar_shape(self) -> tuple[int]:
     raise NotImplementedError("To be implemented by the subclass.")
 
-  def __getitem__(self, index: Union[int, slice]) -> ExemplarType:
+  def __getitem__(self, index: int | slice) -> ExemplarType:
     raise NotImplementedError("To be implemented by the subclass.")
 
   @cached_property
