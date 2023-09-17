@@ -17,13 +17,23 @@ To install a Conda environment with the requisite packages on CPU:
 conda env create --file environment-cpu.yml
 ```
 
-To test the code by running a quick visualization:
+To test the code a quick debug run:
 
 ```sh
-TODO
+python -m nets.experiments.in_context_learning.launcher_local
 ```
 
 ## Installation
+
+Optionally, define a few environment variables
+by adding the following to a shell configuration file such as
+`~/.bashrc`, `~/.bash_profile`, `~/.bash_login`, or `~/.profile`:
+
+```sh
+export SCRATCH_HOME="..."
+```
+
+Then, follow one of two methods below to install `nets`.
 
 ### Method #1: via Conda
 

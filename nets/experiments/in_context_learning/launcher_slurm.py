@@ -1,6 +1,5 @@
-"""Launcher for local runs of in-context learning simulations."""
+"""Launcher for SLURM runs of in-context learning simulations."""
 import logging
-import os
 from pathlib import Path
 
 from dataclasses import dataclass
@@ -9,13 +8,14 @@ from dataclasses import field
 import jax
 import optax
 
+import nets
 from nets.launch import configs
 from nets.launch import submit
 from nets.launch.hparams import Param
 from nets.launch.hparams import EnumParam
 from nets.launch.hparams import FixedParam
-
-from nets.simulators import in_context_learning
+from nets.launch.hparams import LogUniformParam
+from nets.launch.hparams import UniformParam
 
 from nets import datasets
 from nets import samplers
@@ -68,28 +68,23 @@ class SearchConfig(configs.Config):
 
 
 @dataclass(frozen=True, kw_only=True)
-class DebugSearchConfig(SearchConfig):
-  """Singleton config for debugging."""
+class SymbolicSearchConfig(SearchConfig):
+  """Singleton hyperparameter search for the symbolic dataset."""
 
-  seed: Param = field(default_factory=lambda: FixedParam(0))
+  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(100))
 
-  # No training.
-  num_epochs: Param = field(default_factory=lambda: FixedParam(0))
-  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(1))
-
-  # Teeny tiny model.
-  embed_dim: Param = field(default_factory=lambda: FixedParam(8))
+  embed_dim: Param = field(default_factory=lambda: FixedParam(64))
   num_heads: Param = field(default_factory=lambda: FixedParam(8))
   depth: Param = field(default_factory=lambda: FixedParam(2))
   mlp_ratio: Param = field(default_factory=lambda: FixedParam(4.0))
   causal: Param = field(default_factory=lambda: FixedParam(True))
 
-  num_train_classes: Param = field(default_factory=lambda: FixedParam(80))
-  num_valid_classes: Param = field(default_factory=lambda: FixedParam(20))
-  num_test_classes: Param = field(default_factory=lambda: FixedParam(16))
-  prop_train_labels: Param = field(default_factory=lambda: FixedParam(0.8))
-  prop_valid_labels: Param = field(default_factory=lambda: FixedParam(0.7))
-  prop_test_labels: Param = field(default_factory=lambda: FixedParam(0.3))
+  num_train_classes: Param = field(default_factory=lambda: FixedParam(1600))
+  num_valid_classes: Param = field(default_factory=lambda: FixedParam(2))
+  num_test_classes: Param = field(default_factory=lambda: FixedParam(2))
+  prop_train_labels: Param = field(default_factory=lambda: FixedParam(1.0))
+  prop_valid_labels: Param = field(default_factory=lambda: FixedParam(1.0))
+  prop_test_labels: Param = field(default_factory=lambda: FixedParam(1.0))
   dataset_cls: Param = field(
     default_factory=lambda: FixedParam(datasets.SymbolicDataset)
   )
@@ -97,13 +92,13 @@ class DebugSearchConfig(SearchConfig):
     default_factory=lambda: FixedParam(datasets.ExemplarLabeling.STANDARD)
   )
   holdout_class_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.HoldoutClassLabeling.STANDARD)
+    default_factory=lambda: FixedParam(datasets.HoldoutClassLabeling.TRAIN_LABELS)
   )
   num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(20))
-  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(1.0))
+  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(0.1))
 
-  num_train_seqs: Param = field(default_factory=lambda: FixedParam(int(1e3)))
-  num_eval_seqs: Param = field(default_factory=lambda: FixedParam(int(1e2)))
+  num_train_seqs: Param = field(default_factory=lambda: FixedParam(int(1e5 * 32)))
+  num_eval_seqs: Param = field(default_factory=lambda: FixedParam(int(1e2 * 32)))
   train_sampler_cls: Param = field(
     default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
   )
@@ -115,30 +110,44 @@ class DebugSearchConfig(SearchConfig):
   )
   train_context_len: Param = field(default_factory=lambda: FixedParam(2))
   train_zipf_exponent: Param = field(default_factory=lambda: FixedParam(1.0))
-  train_relabeling: Param = field(default_factory=lambda: FixedParam(False))
+  train_relabeling: Param = field(default_factory=lambda: FixedParam(True))
 
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.INFO)
 
   executor = submit.get_submitit_executor(
-    cluster="local",
+    cluster="slurm",
+    #
+    ### Output directory. ###
     log_dir=Path(
-      "/tmp",
-      os.environ["USER"],
+      nets.SCRATCH_DIR,
       "in-ctx",
       submit.get_timestamp(),
     ),
+    #
+    ### GPU mode. ###
+    slurm_partition="gpu",
+    slurm_parallelism=50,
+    #
+    ### CPU mode. ###
+    # slurm_partition="cpu",
+    # gpus_per_node=0,
+    #
+    # 24-hour time limit per job.
+    timeout_min=60 * 24,
   )
 
-  jobs = executor.map_array(
-    lambda kwargs: in_context_learning.simulate(
-      **kwargs,
-    ),
-    DebugSearchConfig(
-      key=jax.random.PRNGKey(0),
-      num_configs=1,
-    ),
+  # Change config here.
+  cfg = SymbolicSearchConfig(
+    key=jax.random.PRNGKey(0),
+    num_configs=500,
+    seed=UniformParam(0, (1 << 15) - 1),
+    embed_dim=EnumParam((16, 32, 64)),
+    num_train_classes=LogUniformParam(20, 2000, base=10),
+    prop_train_labels=UniformParam(0.25, 1.0),
+    num_exemplars_per_class=LogUniformParam(1, 1000, base=10),
+    exemplar_noise_scale=LogUniformParam(1e-1, 1e3, base=10),
   )
-  result = jobs[0].result()
-  print(result)
+
+  jobs = submit.submit_jobs(executor, cfg)

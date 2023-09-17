@@ -14,6 +14,7 @@ dependencies:
   - pandas>=2.0
   - pytables
   - submitit
+  - tqdm
 
   # JAX:
   - conda-forge::jax

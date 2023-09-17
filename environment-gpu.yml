@@ -14,6 +14,7 @@ dependencies:
   - pandas>=2.0
   - pytables
   - submitit
+  - tqdm
 
   # NOTE: The following requires a GPU node available
   # at the time of creating the environment.

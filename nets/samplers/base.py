@@ -232,14 +232,15 @@ class ClassificationSequenceSampler(SequenceSampler):
       relabeling = jnp.eye(n)[perm]
       return (onehot_labels @ relabeling).argmax(axis=-1)
 
+    def do_not_relabel_sequence(key, labels):
+      del key
+      return labels
+
+    # TODO(eringrant): Satisfy type-checker but avoid branching.
     if relabel_sequences:
       self.relabel_sequences = jax.jit(jax.vmap(relabel_sequence))
     else:
-
-      def identity(x):
-        return x
-
-      self.relabel_sequences = jax.jit(jax.vmap(identity))
+      self.relabel_sequences = jax.jit(jax.vmap(do_not_relabel_sequence))
 
     # PRNG depends on `MAX_NUM_SEQS` parameter in the infinite `Sampler` case.
     self._seq_keys = jax.random.split(key, num_seqs or MAX_NUM_SEQS)

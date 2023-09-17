@@ -131,8 +131,9 @@ def submit_jobs(executor: Executor, cfg: configs.Config):
 
   # Dump the config at root.
   job_root = executor.folder.parent
-  with open(os.path.join(job_root, "config.pkl"), "wb") as f:
-    pickle.dump(cfg, f)
+  if executor.cluster != "debug":
+    with open(os.path.join(job_root, "config.pkl"), "wb") as f:
+      pickle.dump(cfg, f)
 
   async def async_annotate():
     # Annotate results as they become available.
@@ -149,6 +150,10 @@ def submit_jobs(executor: Executor, cfg: configs.Config):
 
   results_paths = asyncio.run(async_annotate())
   logging.info("All jobs terminated.")
+
+  if executor.cluster == "debug":
+    with open(os.path.join(job_root, "config.pkl"), "wb") as f:
+      pickle.dump(cfg, f)
 
   # Last step: Try to concatenate all results into a single HDF file.
   # This might error out depending on the joint size of results and the
