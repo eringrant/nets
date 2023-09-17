@@ -1,4 +1,8 @@
 """Neural network models."""
 from .transformers import SequenceClassifier
+from .feedforward import MLP
 
-__all__ = ("SequenceClassifier",)
+__all__ = (
+  "MLP",
+  "SequenceClassifier",
+)

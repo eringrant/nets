@@ -30,7 +30,9 @@ def trunc_normal_init(
 
 # Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py.
 def lecun_normal_init(
-  weight: Array, key: KeyArray, scale: float | None = None
+  weight: Array,
+  key: KeyArray,
+  scale: float = 1.0,
 ) -> Array:
   """LeCun (variance-scaling) normal distribution initialization."""
   _, in_ = weight.shape
@@ -66,7 +68,7 @@ class Linear(enn.Linear):
     trainable: bool = True,
     *,
     key: KeyArray,
-    init_scale: float | None = 1.0,
+    init_scale: float = 1.0,
   ):
     """Initialize a linear layer."""
     super().__init__(
@@ -107,6 +109,7 @@ class MLP(eqx.Module):
     drop: float | tuple[float] = 0.0,
     *,
     key: KeyArray = None,
+    init_scale: float = 1.0,
   ):
     """Initialize an MLP.
 
@@ -118,6 +121,7 @@ class MLP(eqx.Module):
        drop: The probability associated with `Dropout`.
        key: A `jax.random.PRNGKey` used to provide randomness for parameter
         initialisation.
+       init_scale: The scale of the variance of the initial weights.
     """
     super().__init__()
     out_features = out_features or in_features
@@ -126,12 +130,18 @@ class MLP(eqx.Module):
     keys = jrandom.split(key, 2)
 
     self.fc1 = Linear(
-      in_features=in_features, out_features=hidden_features, key=keys[0]
+      in_features=in_features,
+      out_features=hidden_features,
+      key=keys[0],
+      init_scale=init_scale,
     )
     self.act = act
     self.drop1 = enn.Dropout(drop_probs[0])
     self.fc2 = Linear(
-      in_features=hidden_features, out_features=out_features, key=keys[1]
+      in_features=hidden_features,
+      out_features=out_features,
+      key=keys[1],
+      init_scale=init_scale,
     )
     self.drop2 = enn.Dropout(drop_probs[1])
 

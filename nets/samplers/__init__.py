@@ -3,6 +3,7 @@ from .base import QueryType
 from .base import Sampler
 from .base import SequenceSampler
 from .base import SingletonSampler
+from .base import EpochSampler
 from .base import ClassificationSequenceSampler
 from .dirichlet_multinomial import DirichletMultinomialSampler
 
@@ -11,6 +12,7 @@ __all__ = (
   "Sampler",
   "SequenceSampler",
   "SingletonSampler",
+  "EpochSampler",
   "ClassificationSequenceSampler",
   "DirichletMultinomialSampler",
 )

@@ -27,11 +27,8 @@ class SearchConfig(configs.Config):
   seed: Param = field(default_factory=lambda: EnumParam(range(0, 3)))
 
   # Model params.
-  embed_dim: Param = field(init=False)
-  num_heads: Param = field(init=False)
-  depth: Param = field(init=False)
-  mlp_ratio: Param = field(init=False)
-  causal: Param = field(init=False)
+  num_hiddens: Param = field(init=False)
+  init_scale: Param = field(init=False)
 
   # Training and evaluation params.
   optimizer_fn: Param = field(default_factory=lambda: FixedParam(optax.adam))
@@ -43,27 +40,13 @@ class SearchConfig(configs.Config):
   evaluate_on_test_split: Param = field(default_factory=lambda: FixedParam(False))
 
   # Dataset params.
-  num_train_classes: Param = field(init=False)  # `init=False` toavoid init
-  num_valid_classes: Param = field(init=False)  # of to-be-overridden value.
-  num_test_classes: Param = field(init=False)
-  prop_train_labels: Param = field(init=False)
-  prop_valid_labels: Param = field(init=False)
-  prop_test_labels: Param = field(init=False)
   dataset_cls: Param = field(init=False)
-  exemplar_labeling: Param = field(init=False)
-  holdout_class_labeling: Param = field(init=False)
+  num_dimensions: Param = field(init=False)
   num_exemplars_per_class: Param = field(init=False)
   exemplar_noise_scale: Param = field(init=False)
 
   # Sampler params.
-  num_train_seqs: Param = field(init=False)
-  num_eval_seqs: Param = field(init=False)
-  train_sampler_cls: Param = field(init=False)
-  eval_sampler_cls: Param = field(init=False)
-  train_query_type: Param = field(init=False)
-  train_context_len: Param = field(init=False)
-  train_zipf_exponent: Param = field(init=False)
-  train_relabeling: Param = field(init=False)
+  sampler_cls: Param = field(init=False)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -77,44 +60,14 @@ class DebugSearchConfig(SearchConfig):
   evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(1))
 
   # Teeny tiny model.
-  embed_dim: Param = field(default_factory=lambda: FixedParam(8))
-  num_heads: Param = field(default_factory=lambda: FixedParam(8))
-  depth: Param = field(default_factory=lambda: FixedParam(2))
-  mlp_ratio: Param = field(default_factory=lambda: FixedParam(4.0))
-  causal: Param = field(default_factory=lambda: FixedParam(True))
+  num_hiddens: Param = field(default_factory=lambda: FixedParam(8))
+  init_scale: Param = field(default_factory=lambda: FixedParam(1.0))
 
-  num_train_classes: Param = field(default_factory=lambda: FixedParam(80))
-  num_valid_classes: Param = field(default_factory=lambda: FixedParam(20))
-  num_test_classes: Param = field(default_factory=lambda: FixedParam(16))
-  prop_train_labels: Param = field(default_factory=lambda: FixedParam(0.8))
-  prop_valid_labels: Param = field(default_factory=lambda: FixedParam(0.7))
-  prop_test_labels: Param = field(default_factory=lambda: FixedParam(0.3))
-  dataset_cls: Param = field(
-    default_factory=lambda: FixedParam(datasets.SymbolicDataset)
-  )
-  exemplar_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.ExemplarLabeling.STANDARD)
-  )
-  holdout_class_labeling: Param = field(
-    default_factory=lambda: FixedParam(datasets.HoldoutClassLabeling.STANDARD)
-  )
-  num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(20))
-  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(1.0))
-
-  num_train_seqs: Param = field(default_factory=lambda: FixedParam(int(1e3)))
-  num_eval_seqs: Param = field(default_factory=lambda: FixedParam(int(1e2)))
-  train_sampler_cls: Param = field(
-    default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
-  )
-  eval_sampler_cls: Param = field(
-    default_factory=lambda: FixedParam(samplers.DirichletMultinomialSampler)
-  )
-  train_query_type: Param = field(
-    default_factory=lambda: FixedParam(samplers.QueryType.SUPPORTED)
-  )
-  train_context_len: Param = field(default_factory=lambda: FixedParam(2))
-  train_zipf_exponent: Param = field(default_factory=lambda: FixedParam(1.0))
-  train_relabeling: Param = field(default_factory=lambda: FixedParam(False))
+  dataset_cls: Param = field(default_factory=lambda: FixedParam(datasets.ParityDataset))
+  num_dimensions: Param = field(default_factory=lambda: FixedParam(2))
+  num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(16))
+  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(0.1))
+  sampler_cls: Param = field(default_factory=lambda: FixedParam(samplers.EpochSampler))
 
 
 if __name__ == "__main__":
@@ -124,7 +77,7 @@ if __name__ == "__main__":
     cluster="debug",
     log_dir=Path(
       nets.SCRATCH_DIR,
-      "in-ctx",
+      "osgd",
       submit.get_timestamp(),
     ),
     gpus_per_node=0,
@@ -134,6 +87,7 @@ if __name__ == "__main__":
     executor=executor,
     fn=simulate,
     cfg=DebugSearchConfig(
+      num_epochs=FixedParam(10),
       key=jax.random.PRNGKey(0),
       num_configs=1,
     ),
