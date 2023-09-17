@@ -117,6 +117,7 @@ class SymbolicDataset(Dataset):
 
   @property
   def exemplar_shape(self) -> tuple[int]:
+    """Returns the shape of an exemplar."""
     """Shape of an exemplar."""
     return (self.num_classes,)
 

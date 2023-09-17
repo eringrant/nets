@@ -158,6 +158,7 @@ class Dataset:
         + int(prop_test_labels * self.num_test_classes)
       )
 
+    # TODO(eringrant): Empty valid class set?
     if not all(
       0.0 < p <= 1.0
       for p in (
