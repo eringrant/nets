@@ -381,4 +381,11 @@ def simulate(
     CategoricalDtype(categories=("train", "eval"), ordered=True)
   )
 
+  return model, df
+
+
+def simulate_return_df(**kwargs):
+  """Simulate and return only the DataFrame."""
+  model, df = simulate(**kwargs)
+  del model
   return df

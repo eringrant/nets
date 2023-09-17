@@ -40,10 +40,10 @@ def augment_df_with_kwargs(func):
 class Executor(submitit.AutoExecutor):
   """A `submitit.AutoExecutor` with a custom `starmap_array` method."""
 
-  def starmap_array(self, fn: Callable, iterable: Iterable) -> list[Any]:
+  def starmap_array(self, func: Callable, iterable: Iterable) -> list[Any]:
     """A distributed equivalent of the `itertools.starmap` function."""
     submissions = [
-      submitit.core.utils.DelayedSubmission(fn, **kwargs) for kwargs in iterable
+      submitit.core.utils.DelayedSubmission(func, **kwargs) for kwargs in iterable
     ]
     if len(submissions) == 0:
       print("Received an empty job array")
@@ -113,14 +113,37 @@ def get_submitit_executor(
   return executor
 
 
-def submit_jobs(executor: Executor, fn: Callable, cfg: configs.Config):
-  """Submit jobs to the cluster."""
+def submit_jobs(
+  executor: Executor,
+  func: Callable,
+  cfg: configs.Config,
+):
+  """Submit jobs via `executor` by mapping `func` over `kwargs_array`."""
+  # Launch jobs.
+  logging.info("Launching jobs...")
+  jobs = executor.starmap_array(
+    func,
+    cfg,
+  )
+  logging.info(f"Waiting for {len(jobs)} jobs to terminate...")
+  tuple(job.result() for job in jobs)
+  logging.info("All jobs terminated.")
+
+  return jobs
+
+
+def submit_and_annotate_jobs(
+  executor: Executor,
+  func: Callable,
+  cfg: configs.Config,
+):
+  """Submit jobs to the cluster and annotate results as they come in."""
   logging.info(f"Using config {pprint.pformat(cfg)}.")
 
   # Launch jobs.
   logging.info("Launching jobs...")
   jobs = executor.starmap_array(
-    augment_df_with_kwargs(fn),
+    augment_df_with_kwargs(func),
     cfg,
   )
   logging.info(f"Waiting for {len(jobs)} jobs to terminate...")

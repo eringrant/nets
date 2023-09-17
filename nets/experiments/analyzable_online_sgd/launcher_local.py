@@ -1,4 +1,4 @@
-"""Launcher for local runs of in-context learning simulations."""
+"""Launcher for local online stochastic gradient descent runs."""
 import logging
 from pathlib import Path
 
@@ -17,7 +17,7 @@ from nets.launch.hparams import Param
 from nets.launch.hparams import EnumParam
 from nets.launch.hparams import FixedParam
 
-from nets.simulators.online_sgd import simulate
+from nets.simulators.online_sgd import simulate_return_df
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -36,7 +36,7 @@ class SearchConfig(configs.Config):
   train_batch_size: Param = field(default_factory=lambda: FixedParam(32))
   eval_batch_size: Param = field(default_factory=lambda: FixedParam(32))
   num_epochs: Param = field(default_factory=lambda: FixedParam(1))
-  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(100))
+  evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(1))
   evaluate_on_test_split: Param = field(default_factory=lambda: FixedParam(False))
 
   # Dataset params.
@@ -60,13 +60,13 @@ class DebugSearchConfig(SearchConfig):
   evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(1))
 
   # Teeny tiny model.
-  num_hiddens: Param = field(default_factory=lambda: FixedParam(8))
+  num_hiddens: Param = field(default_factory=lambda: FixedParam(64))
   init_scale: Param = field(default_factory=lambda: FixedParam(1.0))
 
   dataset_cls: Param = field(default_factory=lambda: FixedParam(datasets.ParityDataset))
   num_dimensions: Param = field(default_factory=lambda: FixedParam(2))
-  num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(16))
-  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(0.1))
+  num_exemplars_per_class: Param = field(default_factory=lambda: FixedParam(64))
+  exemplar_noise_scale: Param = field(default_factory=lambda: FixedParam(0.2))
   sampler_cls: Param = field(default_factory=lambda: FixedParam(samplers.EpochSampler))
 
 
@@ -85,9 +85,9 @@ if __name__ == "__main__":
 
   jobs = submit.submit_jobs(
     executor=executor,
-    fn=simulate,
+    func=simulate_return_df,
     cfg=DebugSearchConfig(
-      num_epochs=FixedParam(10),
+      num_epochs=FixedParam(15),
       key=jax.random.PRNGKey(0),
       num_configs=1,
     ),

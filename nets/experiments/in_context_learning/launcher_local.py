@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
   jobs = submit.submit_jobs(
     executor=executor,
-    fn=simulate,
+    func=simulate,
     cfg=DebugSearchConfig(
       key=jax.random.PRNGKey(0),
       num_configs=1,
