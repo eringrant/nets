@@ -1,4 +1,4 @@
-"""Launcher for local runs of analyzable online SGD."""
+"""Launcher for local runs of in-context learning simulations."""
 import logging
 from pathlib import Path
 
@@ -9,16 +9,15 @@ import jax
 import optax
 
 import nets
+from nets import datasets
+from nets import samplers
 from nets.launch import configs
 from nets.launch import submit
 from nets.launch.hparams import Param
 from nets.launch.hparams import EnumParam
 from nets.launch.hparams import FixedParam
 
-from nets.simulators import in_context_learning
-
-from nets import datasets
-from nets import samplers
+from nets.simulators.online_sgd import simulate
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -122,22 +121,23 @@ if __name__ == "__main__":
   logging.basicConfig(level=logging.INFO)
 
   executor = submit.get_submitit_executor(
-    cluster="local",
+    cluster="debug",
     log_dir=Path(
       nets.SCRATCH_DIR,
-      "osgd",
+      "in-ctx",
       submit.get_timestamp(),
     ),
+    gpus_per_node=0,
   )
 
-  jobs = executor.map_array(
-    lambda kwargs: in_context_learning.simulate(
-      **kwargs,
-    ),
-    DebugSearchConfig(
+  jobs = submit.submit_jobs(
+    executor=executor,
+    fn=simulate,
+    cfg=DebugSearchConfig(
       key=jax.random.PRNGKey(0),
       num_configs=1,
     ),
   )
+
   result = jobs[0].result()
   print(result)
