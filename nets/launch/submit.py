@@ -16,10 +16,8 @@ from tqdm.asyncio import tqdm
 
 import submitit
 
-from nets.simulators.in_context_learning import simulate
 from nets.launch import analyze
 from nets.launch import configs
-
 
 # Ignore warnings about invalid column names for PyTables.
 import warnings
@@ -29,7 +27,7 @@ warnings.filterwarnings("ignore", category=NaturalNameWarning)
 
 
 def augment_df_with_kwargs(func):
-  """Return a function augments a `pd.DataFrame` with keyword arguments."""
+  """Return a function that augments a `pd.DataFrame` with keyword arguments."""
 
   def wrapped(**kwargs):
     results_df = func(**kwargs)
@@ -42,9 +40,7 @@ def augment_df_with_kwargs(func):
 class Executor(submitit.AutoExecutor):
   """A `submitit.AutoExecutor` with a custom `starmap_array` method."""
 
-  def starmap_array(
-    self, fn: Callable, iterable: Iterable | configs.Config
-  ) -> list[Any]:
+  def starmap_array(self, fn: Callable, iterable: Iterable) -> list[Any]:
     """A distributed equivalent of the `itertools.starmap` function."""
     submissions = [
       submitit.core.utils.DelayedSubmission(fn, **kwargs) for kwargs in iterable
@@ -117,14 +113,14 @@ def get_submitit_executor(
   return executor
 
 
-def submit_jobs(executor: Executor, cfg: configs.Config):
+def submit_jobs(executor: Executor, fn: Callable, cfg: configs.Config):
   """Submit jobs to the cluster."""
   logging.info(f"Using config {pprint.pformat(cfg)}.")
 
   # Launch jobs.
   logging.info("Launching jobs...")
   jobs = executor.starmap_array(
-    augment_df_with_kwargs(simulate),
+    augment_df_with_kwargs(fn),
     cfg,
   )
   logging.info(f"Waiting for {len(jobs)} jobs to terminate...")

@@ -9,15 +9,15 @@ import jax
 import optax
 
 import nets
+from nets import datasets
+from nets import samplers
 from nets.launch import configs
 from nets.launch import submit
 from nets.launch.hparams import Param
 from nets.launch.hparams import EnumParam
 from nets.launch.hparams import FixedParam
 
-
-from nets import datasets
-from nets import samplers
+from nets.simulators.in_context_learning import simulate
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -132,6 +132,7 @@ if __name__ == "__main__":
 
   jobs = submit.submit_jobs(
     executor=executor,
+    fn=simulate,
     cfg=DebugSearchConfig(
       key=jax.random.PRNGKey(0),
       num_configs=1,

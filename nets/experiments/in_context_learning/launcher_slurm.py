@@ -9,6 +9,8 @@ import jax
 import optax
 
 import nets
+from nets import datasets
+from nets import samplers
 from nets.launch import configs
 from nets.launch import submit
 from nets.launch.hparams import Param
@@ -17,8 +19,7 @@ from nets.launch.hparams import FixedParam
 from nets.launch.hparams import LogUniformParam
 from nets.launch.hparams import UniformParam
 
-from nets import datasets
-from nets import samplers
+from nets.simulators.in_context_learning import simulate
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -150,4 +151,4 @@ if __name__ == "__main__":
     exemplar_noise_scale=LogUniformParam(1e-1, 1e3, base=10),
   )
 
-  jobs = submit.submit_jobs(executor, cfg)
+  jobs = submit.submit_jobs(executor, simulate, cfg)
