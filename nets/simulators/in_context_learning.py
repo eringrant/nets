@@ -307,7 +307,6 @@ def simulate(
 ) -> tuple[pd.DataFrame, ...]:
   """Simulate in-context learning of classification tasks."""
   logging.info(f"Using JAX backend: {jax.default_backend()}\n")
-
   logging.info(f"Using configuration: {pprint.pformat(locals())}")
 
   # Single source of randomness.
