@@ -1,25 +1,22 @@
 """`Sampler`s are sequences of samples from a `Dataset`."""
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing_extensions import Protocol
-from jaxtyping import Array
-from jax.random import KeyArray
-from nets.datasets.base import ExemplarType
-
-from enum import Enum
-from enum import unique
-
 import copy
+from collections.abc import Sequence
+from enum import Enum, unique
 from functools import partial
+from typing import TYPE_CHECKING, Self
 
 import jax
-from jax import numpy as jnp
+from jax import Array
 from jax import nn as jnn
+from jax import numpy as jnp
+from typing_extensions import Protocol
 
-from nets.datasets import Dataset
-from nets.datasets import DatasetSplit
+from nets.datasets import Dataset, DatasetSplit
 
+if TYPE_CHECKING:
+  from nets.datasets.base import ExemplarType
 
 # The initial number of sequences to instantiate within an infinite `Sampler`.
 # Changing this parameter impacts PRNGs for sequence sampling.
@@ -51,7 +48,7 @@ def zipfian_distribution(num_classes: int, zipf_exponent: float) -> Array:
 
 
 def generate_exemplar_idx_sequence(
-  key: KeyArray,
+  key: Array,
   label_seq: Array,
   dataset_labels: Array,
 ) -> Array:
@@ -71,30 +68,31 @@ def generate_exemplar_idx_sequence(
   # Identify valid class exemplars for each element of the sequence
   # via a [context_len + 1, dataset_len] mask.
   exemplar_mask_seq = jnn.one_hot(
-    dataset_labels, num_classes=dataset_labels.max(), dtype=jnp.int_
+    dataset_labels,
+    num_classes=dataset_labels.max(),
+    dtype=jnp.int_,
   ).T[label_seq]
 
   @partial(jax.vmap, in_axes=0)
-  def _sample_exemplar(key, p):
+  def _sample_exemplar(key: Array, p: float) -> Array:
     # Note: This samples exemplars independently, and thus with replacement,
     # which gives the possibility of duplicate exemplars in a sequence.
     return jax.random.choice(key, jnp.arange(len(dataset_labels)), shape=(), p=p)
 
   # Sample an exemplar per class element in the sequence.
-  exemplar_idx_seq = _sample_exemplar(
+  return _sample_exemplar(
     jax.random.split(key, len(exemplar_mask_seq)),
     jax.nn.softmax(jnp.log(exemplar_mask_seq)),
   )
 
   # A [context_len + 1] array of indices into `dataset_labels`,
   # corresponding to sampled exemplars.
-  return exemplar_idx_seq
 
 
 class ClassSampler(Protocol):
   """Protocol for a function that generates a sequence of class indices."""
 
-  def __call__(self, key: KeyArray, num_classes: int) -> Array:
+  def __call__(self: Self, key: Array, num_classes: int) -> Array:
     """Generate a sequence of class indices."""
     ...
 
@@ -102,13 +100,18 @@ class ClassSampler(Protocol):
 class ExemplarSampler(Protocol):
   """Protocol for a function that generates a sequence of exemplar indices."""
 
-  def __call__(self, key: KeyArray, label_seq: Array, dataset_labels: Array) -> Array:
+  def __call__(
+    self: Self,
+    key: Array,
+    label_seq: Array,
+    dataset_labels: Array,
+  ) -> Array:
     """Generate a sequence of exemplar indices."""
     ...
 
 
 def generate_sequence(
-  key: KeyArray,
+  key: Array,
   dataset_labels: Array,
   classes_to_sample: Array,
   generate_class_idx_sequence_fn: ClassSampler,
@@ -136,20 +139,19 @@ def generate_sequence(
 
   # Sample class indices.
   class_idx_seq = generate_class_idx_sequence_fn(
-    key=class_key, num_classes=classes_to_sample.size
+    key=class_key,
+    num_classes=classes_to_sample.size,
   )
 
   # Translate class indices into class labels.
   label_seq = jnp.take(classes_to_sample, class_idx_seq)
 
   # Sample exemplar indices.
-  exemplar_idx_seq = generate_exemplar_idx_sequence_fn(
+  return generate_exemplar_idx_sequence_fn(
     key=exemplar_key,
     label_seq=label_seq,
     dataset_labels=dataset_labels,
   )
-
-  return exemplar_idx_seq
 
 
 class Sampler(Sequence):
@@ -174,11 +176,11 @@ class EpochSampler(SingletonSampler):
   """Sampler of example-label pairs over multiple epochs."""
 
   def __init__(
-    self,
-    key: KeyArray,
+    self: Self,
+    key: Array,
     dataset: Dataset,
     num_epochs: int | None = None,
-  ):
+  ) -> None:
     """Sampler of example-label pairs over multiple epochs."""
     self.key = key
     self.dataset = dataset
@@ -188,13 +190,13 @@ class EpochSampler(SingletonSampler):
 
     self.dataset_size = len(self.dataset)
 
-  def __len__(self) -> int:
+  def __len__(self: Self) -> int:
     """Return the number of example-label pairs in `Sampler`."""
     if self.num_epochs is None:
       return int(float("inf"))  # Infinite length if num_epochs is not set
     return self.num_epochs * self.dataset_size
 
-  def __getitem__(self, index: int | slice) -> ExemplarType:
+  def __getitem__(self: Self, index: int | slice) -> ExemplarType:
     """Return exemplar-class pairs at index `index` of `Sampler`."""
     # TODO(eringrant): Simplify this while maintaining type-validity.
     if isinstance(index, slice):
@@ -207,12 +209,14 @@ class EpochSampler(SingletonSampler):
       unique_vals = jnp.unique(epoch_idx)
       if unique_vals.size != 1:
         # TODO(eringrant): Implement this case.
-        raise ValueError("Array should contain only one unique value.")
+        msg = "Array should contain only one unique value."
+        raise ValueError(msg)
       epoch_idx = unique_vals[0]
     index_in_epoch = transformed_index % self.dataset_size
 
     if self.num_epochs is not None and epoch_idx >= self.num_epochs:
-      raise StopIteration("Reached the end of data generation.")
+      msg = "Reached the end of data generation."
+      raise StopIteration(msg)
 
     epoch_key = jax.random.fold_in(self.key, epoch_idx)
     permuted_index = jax.random.permutation(
@@ -231,15 +235,16 @@ class ClassificationSequenceSampler(SequenceSampler):
   """Sampler of sequences of example-label pairs."""
 
   def __init__(
-    self,
-    key: KeyArray,
+    self: Self,
+    *,
+    key: Array,
     dataset: Dataset,
     class_split: DatasetSplit,
     exemplar_split: DatasetSplit,
     class_idx_sequence_sampler: ClassSampler,
     relabel_sequences: bool = False,
     num_seqs: int | None = None,
-  ):
+  ) -> None:
     """Sampler of sequences of example-label pairs.
 
     Args:
@@ -257,6 +262,9 @@ class ClassificationSequenceSampler(SequenceSampler):
         `class_idx_sequence_sampler`. If `None`, sample an infinite sequence of
         sequences.
     """
+    # TODO(eringrant): Use it or lose it.
+    del exemplar_split
+
     # The classes to sample from are determined by the dataset split.
     if class_split == DatasetSplit.ALL:
       dataset_classes = dataset.unique_classes
@@ -267,10 +275,12 @@ class ClassificationSequenceSampler(SequenceSampler):
     elif class_split == DatasetSplit.TEST:
       dataset_classes = dataset.test_classes
     else:
-      raise ValueError(f"Unrecognized split: {class_split}")
+      msg = f"Unrecognized split: {class_split}"
+      raise ValueError(msg)
 
     if len(dataset_classes) < 2:
-      raise ValueError(f"Class split has too few classes: {class_split}")
+      msg = f"Class split has too few classes: {class_split}"
+      raise ValueError(msg)
 
     self._dataset = dataset
     self.num_seqs = num_seqs
@@ -280,26 +290,26 @@ class ClassificationSequenceSampler(SequenceSampler):
       jax.vmap(
         partial(
           generate_sequence,
-          dataset_labels=self._dataset._labels,
+          # TODO(eringrant): Public interface for `Dataset` labels.
+          dataset_labels=self._dataset._labels,  # noqa: SLF001
           classes_to_sample=jnp.asarray(dataset_classes),
           generate_class_idx_sequence_fn=class_idx_sequence_sampler,
           generate_exemplar_idx_sequence_fn=generate_exemplar_idx_sequence,
-        )
-      )
+        ),
+      ),
     )
 
-    def relabel_sequence(key, labels):
+    def relabel_sequence(key: Array, labels: Array) -> Array:
       n = self._dataset.num_observed_classes
       onehot_labels = jnn.one_hot(labels, n)
       perm = jax.random.permutation(key, n)
       relabeling = jnp.eye(n)[perm]
       return (onehot_labels @ relabeling).argmax(axis=-1)
 
-    def do_not_relabel_sequence(key, labels):
+    def do_not_relabel_sequence(key: Array, labels: Array) -> Array:
       del key
       return labels
 
-    # TODO(eringrant): Satisfy type-checker but avoid branching.
     if relabel_sequences:
       self.relabel_sequences = jax.jit(jax.vmap(relabel_sequence))
     else:
@@ -308,34 +318,38 @@ class ClassificationSequenceSampler(SequenceSampler):
     # PRNG depends on `MAX_NUM_SEQS` parameter in the infinite `Sampler` case.
     self._seq_keys = jax.random.split(key, num_seqs or MAX_NUM_SEQS)
 
-  def __len__(self) -> int:
+  def __len__(self: Self) -> int:
     """Return the number of sequences in `Sampler`."""
     if self.num_seqs is None:
-      raise AttributeError("An infinite sequence does not have finite length.")
+      msg = "An infinite sequence does not have finite length."
+      raise AttributeError(msg)
+
     return self.num_seqs
 
-  def __getitem__(self, index: int | slice) -> ExemplarType:
+  def __getitem__(self: Self, index: int | slice) -> ExemplarType:
     """Return exemplar-class pairs for the sequence at `index` of `Sampler`."""
     if isinstance(index, int):
       index_max = index
-    else:
-      # Case checking for infinite and finite `slice`s.
-      if index.stop is None:
-        if self.num_seqs is None:
-          raise ValueError("cannot slice till the end of an infinite `Sampler`")
-        else:
-          index_max = self.num_seqs
-      else:
-        index_max = index.stop
 
-    # If infinite `Sampler`, dynamically expand PRNGKey array.
+    # Case checking for infinite and finite `slice`s.
+    elif index.stop is None:
+      if self.num_seqs is None:
+        msg = "cannot slice till the end of an infinite `Sampler`"
+        raise ValueError(msg)
+      else:  # noqa: RET506
+        index_max = self.num_seqs
+    else:
+      index_max = index.stop
+
+    # Dynamically expand PRNGKey array if necessary.
     if index_max > self._seq_keys.shape[0]:
       if self.num_seqs is None:
         self._seq_keys = jnp.concatenate(
-          (self._seq_keys, jax.random.split(self._seq_keys[-1], MAX_NUM_SEQS))
+          (self._seq_keys, jax.random.split(self._seq_keys[-1], MAX_NUM_SEQS)),
         )
       else:
-        raise IndexError("index out of range")
+        msg = "index out of range"
+        raise IndexError(msg)
     seq_key = self._seq_keys[index]
 
     if isinstance(index, int):
@@ -345,7 +359,9 @@ class ClassificationSequenceSampler(SequenceSampler):
     exemplars, labels = self._dataset[exemplar_idx_seq]
 
     if isinstance(index, int):
-      assert len(exemplars) == 1 and len(labels) == 1
+      if not (len(exemplars) == 1 and len(labels) == 1):
+        msg = "Sequence length should be 1 for integer indexing."
+        raise ValueError(msg)
       exemplars = exemplars[0]
       labels = labels[0]
 
@@ -357,9 +373,9 @@ class ClassificationSequenceSampler(SequenceSampler):
     return exemplars, labels
 
   # TODO(eringrant): Make less brittle (reliant on copying & setting attributes).
-  def take(self, count: int) -> Sampler:
+  def take(self: Self, count: int) -> Sampler:
     """Return a `Sampler` with the first `count` sequences of `Sampler`."""
     take_dataset = copy.copy(self)
-    take_dataset._seq_keys = self._seq_keys[:count]
+    take_dataset._seq_keys = self._seq_keys[:count]  # noqa: SLF001
     take_dataset.num_seqs = count
     return take_dataset

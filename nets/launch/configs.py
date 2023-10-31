@@ -22,20 +22,15 @@ executor = Executor(...)
 executor.starmap_array(simulate, Config(...))
 ```
 """
-from typing import Any
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from dataclasses import asdict, dataclass, field, fields
 from itertools import count
+from typing import Any, Self
 
-from dataclasses import asdict
-from dataclasses import dataclass
-from dataclasses import field
-from dataclasses import fields
+import jax
+import numpy as np
 
 from nets.launch.hparams import Param
-
-
-import numpy as np
-import jax
 
 
 # TODO(eringrant): Re-enable grid search if all hyperparameters are enums.
@@ -50,21 +45,22 @@ class Config:
   # Dataclass fields shared by all subclasses.
   seed: Param = field(init=False)
 
-  def __post_init__(self):
+  def __post_init__(self: Self) -> None:
     """Check that types are as expected after initialization."""
     num_unique_configs = 1
 
     for field_ in fields(self):
-      if field_.name == "key" or field_.name == "num_configs":
+      if field_.name in {"key", "num_configs"}:
         continue
       current_field_value = asdict(self)[field_.name]
 
       if not isinstance(current_field_value, field_.type):
         current_field_type = type(current_field_value)
-        raise TypeError(
-          f"The field `{field_.name}` has type "
-          f"`{current_field_type}` instead of `{field_.type}`."
+        msg = (
+          f"The field `{field_.name}` has type `{current_field_type}` "
+          f"instead of `{field_.type}`."
         )
+        raise TypeError(msg)
 
       try:
         num_unique_configs *= len(current_field_value)
@@ -72,17 +68,17 @@ class Config:
         num_unique_configs *= np.inf
 
     if self.num_configs > num_unique_configs:
-      raise ValueError(
-        f"Requested {self.num_configs} hyperparameter "
-        f"configurations, but only {num_unique_configs} "
-        "unique configuration(s) specified."
+      msg = (
+        f"Requested {self.num_configs} hyperparameter configurations, but only "
+        f"{num_unique_configs} unique configuration(s) specified."
       )
+      raise ValueError(msg)
 
-  def __len__(self) -> int:
+  def __len__(self: Self) -> int:
     """Return the total number of hyperparameter configurations."""
     return self.num_configs
 
-  def __iter__(self):
+  def __iter__(self: Self) -> Iterator[Mapping[str, Any]]:
     """Iterate over `self`; needed to appear as `Iterable` to `mypy`."""
     try:
       for i in count():
@@ -90,14 +86,13 @@ class Config:
     except IndexError:
       return
 
-  def __getitem__(self, index: int) -> Mapping[str, Any]:
+  def __getitem__(self: Self, index: int) -> Mapping[str, Any]:
     """Get the hyperparameter configuration at `index`."""
     try:
       index = range(len(self))[index]
     except IndexError as e:
-      raise IndexError(
-        f"Index out of bounds for `Config` of length {len(self)}."
-      ) from e
+      msg = f"Index out of bounds for `Config` of length {len(self)}."
+      raise IndexError(msg) from e
 
     hparam_dict = asdict(self)
     del hparam_dict["key"]

@@ -1,35 +1,30 @@
 """Submit jobs locally or to a cluster using `submitit`."""
-from typing import Any
-from collections.abc import Callable
-from collections.abc import Iterable
-from typing import Literal
-
 import asyncio
 import datetime
-import pickle
 import logging
-import os
-import pandas as pd
-from pathlib import Path
+import pickle
 import pprint
-from tqdm.asyncio import tqdm
-
-import submitit
-
-from nets.launch import analyze
-from nets.launch import configs
 
 # Ignore warnings about invalid column names for PyTables.
 import warnings
+from collections.abc import Callable, Iterable, Mapping
+from pathlib import Path
+from typing import Any, Literal, Self
+
+import pandas as pd
+import submitit
 from tables import NaturalNameWarning
+from tqdm.asyncio import tqdm
+
+from nets.launch import analyze, configs
 
 warnings.filterwarnings("ignore", category=NaturalNameWarning)
 
 
-def augment_df_with_kwargs(func):
+def augment_df_with_kwargs(func: Callable) -> Callable:
   """Return a function that augments a `pd.DataFrame` with keyword arguments."""
 
-  def wrapped(**kwargs):
+  def wrapped(**kwargs: Mapping) -> pd.DataFrame:
     results_df = func(**kwargs)
     kwargs_df = pd.DataFrame(kwargs, index=(0,))
     return kwargs_df.merge(results_df, how="cross")
@@ -40,13 +35,13 @@ def augment_df_with_kwargs(func):
 class Executor(submitit.AutoExecutor):
   """A `submitit.AutoExecutor` with a custom `starmap_array` method."""
 
-  def starmap_array(self, func: Callable, iterable: Iterable) -> list[Any]:
+  def starmap_array(self: Self, func: Callable, iterable: Iterable) -> list[Any]:
     """A distributed equivalent of the `itertools.starmap` function."""
     submissions = [
       submitit.core.utils.DelayedSubmission(func, **kwargs) for kwargs in iterable
     ]
     if len(submissions) == 0:
-      print("Received an empty job array")
+      logging.info("Received an empty job array.")
       return []
     return self._internal_process_submissions(submissions)
 
@@ -54,15 +49,15 @@ class Executor(submitit.AutoExecutor):
 class IndexedAsyncJobProxy(submitit.core.core.AsyncJobProxy):
   """Return the job and the result."""
 
-  async def result(self, poll_interval: int | float = 1):
+  async def result(self: Self, poll_interval: float = 1) -> tuple[submitit.Job, Any]:
     """Return the job and the result."""
     await self.wait(poll_interval)
     return self.job, self.job.result()
 
 
-def get_timestamp():
+def get_timestamp() -> str:
   """Return a date and time `str` timestamp."""
-  return datetime.datetime.now().strftime("%Y-%m-%d-%H:%M")
+  return datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d-%H:%M")
 
 
 def get_submitit_executor(
@@ -75,15 +70,16 @@ def get_submitit_executor(
   mem_gb: int = 16,
   slurm_partition: Literal["debug", "cpu", "gpu"] | None = None,
   slurm_parallelism: int | None = None,
-  slurm_exclude: int | None = None,
 ) -> submitit.Executor:
   """Return a `submitit.Executor` with the given parameters."""
   if gpus_per_node > 4:
-    raise ValueError("The cluster has no more than 4 GPUs per node.")
+    msg = "The cluster has no more than 4 GPUs per node."
+    raise ValueError(msg)
 
   if gpus_per_node > 0:
     if slurm_partition != "gpu":
-      raise ValueError("GPUs requested but GPU partition not specified.")
+      msg = "GPUs requested but GPU partition not specified."
+      raise ValueError(msg)
 
     slurm_setup = [
       "nvidia-smi",
@@ -95,7 +91,7 @@ def get_submitit_executor(
     slurm_setup = None
 
   executor = Executor(
-    folder=os.path.join(log_dir, "%j"),
+    folder=Path(log_dir, "%j"),
     cluster=cluster,
   )
 
@@ -117,7 +113,7 @@ def submit_jobs(
   executor: Executor,
   func: Callable,
   cfg: configs.Config,
-):
+) -> list[submitit.Job]:
   """Submit jobs via `executor` by mapping `func` over `kwargs_array`."""
   # Launch jobs.
   logging.info("Launching jobs...")
@@ -136,7 +132,7 @@ def submit_and_annotate_jobs(
   executor: Executor,
   func: Callable,
   cfg: configs.Config,
-):
+) -> list[submitit.Job]:
   """Submit jobs to the cluster and annotate results as they come in."""
   logging.info(f"Using config {pprint.pformat(cfg)}.")
 
@@ -151,10 +147,10 @@ def submit_and_annotate_jobs(
   # Dump the config at root.
   job_root = executor.folder.parent
   if executor.cluster != "debug":
-    with open(os.path.join(job_root, "config.pkl"), "wb") as f:
+    with Path.open(Path(job_root, "config.pkl"), "wb") as f:
       pickle.dump(cfg, f)
 
-  async def async_annotate():
+  async def async_annotate() -> tuple[Path, ...]:
     # Annotate results as they become available.
     results_paths = []
     for aws in tqdm.as_completed([IndexedAsyncJobProxy(j).result() for j in jobs]):
@@ -165,13 +161,13 @@ def submit_and_annotate_jobs(
       except submitit.core.utils.UncompletedJobError as e:
         logging.info("A job failed to produce a result:")
         logging.info(f"{e}")
-    return results_paths
+    return tuple(results_paths)
 
   results_paths = asyncio.run(async_annotate())
   logging.info("All jobs terminated.")
 
   if executor.cluster == "debug":
-    with open(os.path.join(job_root, "config.pkl"), "wb") as f:
+    with Path.open(Path(job_root, "config.pkl"), "wb") as f:
       pickle.dump(cfg, f)
 
   # Last step: Try to concatenate all results into a single HDF file.

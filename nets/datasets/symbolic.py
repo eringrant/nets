@@ -1,18 +1,20 @@
 """A `SymbolicDataset` of class exemplars from which to draw sequences."""
-from jax.random import KeyArray
-
 from functools import partial
-import numpy as np
+from typing import Self
 
 import jax
-import jax.numpy as jnp
 import jax.nn as jnn
+import jax.numpy as jnp
+import numpy as np
+from jax import Array
 
-from nets.datasets.base import Dataset
-from nets.datasets.base import DatasetSplit
-from nets.datasets.base import ExemplarLabeling
-from nets.datasets.base import ExemplarType
-from nets.datasets.base import HoldoutClassLabeling
+from nets.datasets.base import (
+  Dataset,
+  DatasetSplit,
+  ExemplarLabeling,
+  ExemplarType,
+  HoldoutClassLabeling,
+)
 
 
 class SymbolicDataset(Dataset):
@@ -29,8 +31,8 @@ class SymbolicDataset(Dataset):
   prop_valid_labels: int
 
   def __init__(
-    self,
-    key: KeyArray,
+    self: Self,
+    key: Array,
     split: DatasetSplit,
     exemplar_labeling: ExemplarLabeling,
     holdout_class_labeling: HoldoutClassLabeling,
@@ -42,7 +44,7 @@ class SymbolicDataset(Dataset):
     prop_valid_labels: float = 0,
     num_exemplars_per_class: int = 400,
     exemplar_noise_scale: float = 1e-2,
-  ):
+  ) -> None:
     """A `SymbolicDataset` of class exemplars from which to draw sequences.
 
     Args:
@@ -89,17 +91,20 @@ class SymbolicDataset(Dataset):
 
     if num_exemplars_per_class > 1:
       labels = np.repeat(
-        labels[:, np.newaxis], num_exemplars_per_class, axis=-1
+        labels[:, np.newaxis],
+        num_exemplars_per_class,
+        axis=-1,
       ).reshape(-1)
 
-      # TODO(eringrant): Deal with this params.
+      # TODO(eringrant): Use it or lose it.
       del exemplar_labeling
 
     self._labels = labels
 
     if self.num_exemplars_per_class > 1:
       self._exemplar_keys = jax.random.split(
-        key, self.num_classes * num_exemplars_per_class
+        key,
+        self.num_classes * num_exemplars_per_class,
       )
 
       # Compile functions for sampling at `Dataset.__init__`.
@@ -110,18 +115,18 @@ class SymbolicDataset(Dataset):
               jax.random.multivariate_normal,
               # Isotropic with scale a/C to keep noise level in embeddings constant.
               cov=exemplar_noise_scale / self.num_classes * jnp.eye(self.num_classes),
-            )
-          )
-        )
+            ),
+          ),
+        ),
       )
 
   @property
-  def exemplar_shape(self) -> tuple[int]:
+  def exemplar_shape(self: Self) -> tuple[int]:
     """Returns the shape of an exemplar."""
     """Shape of an exemplar."""
     return (self.num_classes,)
 
-  def __getitem__(self, index: int | slice) -> ExemplarType:
+  def __getitem__(self: Self, index: int | slice) -> ExemplarType:
     """Get the exemplar(s) and the corresponding label(s) at `index`."""
     labels = self._labels[index]
     onehot_labels = jnn.one_hot(labels, self.num_classes)
@@ -143,7 +148,9 @@ class SymbolicDataset(Dataset):
     labels = self.wrap_labels(labels)
 
     if isinstance(index, int):
-      assert len(exemplars) == 1 and len(labels) == 1
+      if not (len(exemplars) == 1 and len(labels) == 1):
+        msg = "Expected single exemplar and label."
+        raise ValueError(msg)
       exemplars = exemplars[0]
       labels = labels[0]
 

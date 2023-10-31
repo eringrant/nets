@@ -1,24 +1,16 @@
 """`Dataset`s are sequences of unique examples."""
-from typing import Any
 from collections.abc import Sequence
-from nptyping import NDArray
-from nptyping import Bool
-from nptyping import Floating
-from nptyping import Int
-from jax.random import KeyArray
-from jaxtyping import Array
-
-from enum import Enum
-from enum import unique
-from functools import cached_property
-from functools import partial
-import numpy as np
+from enum import Enum, unique
+from functools import cached_property, partial
 from pathlib import Path
+from typing import Any, Self
 
 import jax
-import jax.numpy as jnp
 import jax.nn as jnn
-
+import jax.numpy as jnp
+import numpy as np
+from jax import Array
+from nptyping import Bool, Floating, Int, NDArray
 
 # Type hints.
 IndexType = int | Sequence[int] | slice
@@ -65,7 +57,9 @@ def wrap_labels(labels: Array, num_classes: int, modulus: Array) -> Array:
 
 
 def get_wrapped_indices(
-  prop_labels: float, num_classes: int, offset=0
+  prop_labels: float,
+  num_classes: int,
+  offset: int = 0,
 ) -> tuple[int, Array]:
   """Get indices to wrap `num_classes` into `prop_labels` labels."""
   if prop_labels < 1.0:
@@ -92,8 +86,8 @@ class Dataset:
   prop_valid_labels: float
 
   def __init__(
-    self,
-    key: KeyArray,
+    self: Self,
+    key: Array,
     split: DatasetSplit,
     exemplar_labeling: ExemplarLabeling,
     holdout_class_labeling: HoldoutClassLabeling,
@@ -104,7 +98,7 @@ class Dataset:
     num_valid_classes: int = 0,
     prop_valid_labels: float = 0,
     num_exemplars_per_class: int = 400,
-  ):
+  ) -> None:
     """A `Dataset` of class exemplars from which to draw sequences.
 
     Args:
@@ -129,6 +123,11 @@ class Dataset:
       num_exemplars_per_class: Number of exemplars per class to draw from the
           underlying dataset.
     """
+    # TODO(eringrant): Remove these arguments.
+    del key
+    del split
+    del exemplar_labeling
+
     self.num_train_classes = num_train_classes
     self.num_valid_classes = num_valid_classes
     self.num_test_classes = num_test_classes
@@ -139,14 +138,16 @@ class Dataset:
         prop_train_labels * num_train_classes < prop_valid_labels * num_valid_classes
         or prop_train_labels * num_train_classes < prop_test_labels * num_test_classes
       ):
-        raise ValueError(
-          "Relabeling of validation and test sets with train "
-          "labels usually assumes more train classes than "
-          "validation and test classes, but "
+        msg = (
+          "Relabeling of validation and test sets with train labels usually assumes "
+          "more train classes than validation and test classes, but "
           f"{prop_train_labels * num_train_classes} < "
-          f"{prop_valid_labels * num_valid_classes} or "
-          f"{prop_train_labels * num_train_classes} < "
+          f"{prop_valid_labels * num_valid_classes} "
+          f"or {prop_train_labels * num_train_classes} < "
           f"{prop_test_labels * num_test_classes}."
+        )
+        raise ValueError(
+          msg,
         )
 
       self.num_observed_classes = int(prop_train_labels * self.num_train_classes)
@@ -167,13 +168,17 @@ class Dataset:
         prop_test_labels,
       )
     ):
-      raise ValueError(
-        "One of `prop_{train,valid,test}_labels` was invalid: "
+      msg = (
+        f"One of `prop_{{train,valid,test}}_labels` was invalid: "
         f"{prop_train_labels}, {prop_valid_labels}, {prop_test_labels}."
+      )
+      raise ValueError(
+        msg,
       )
 
     num_train_labels, train_indices = get_wrapped_indices(
-      prop_train_labels, num_train_classes
+      prop_train_labels,
+      num_train_classes,
     )
     num_valid_labels, valid_indices = get_wrapped_indices(
       prop_valid_labels,
@@ -198,63 +203,65 @@ class Dataset:
         wrap_labels,
         num_classes=self.num_classes,
         modulus=modulus,
-      )
+      ),
     )
 
-  def __len__(self) -> int:
+  def __len__(self: Self) -> int:
     """Number of exemplars in this `Dataset`."""
     return len(self._exemplars)
 
   @property
-  def num_classes(self) -> int:
+  def num_classes(self: Self) -> int:
     """Number of classes in this `Dataset`."""
     return self.num_train_classes + self.num_valid_classes + self.num_test_classes
 
   @property
-  def exemplar_shape(self) -> tuple[int]:
+  def exemplar_shape(self: Self) -> tuple[int]:
     """Shape of an exemplar."""
-    raise NotImplementedError("To be implemented by the subclass.")
+    msg = "To be implemented by the subclass."
+    raise NotImplementedError(msg)
 
-  def __getitem__(self, index: int | slice) -> ExemplarType:
+  def __getitem__(self: Self, index: int | slice) -> ExemplarType:
     """Get the exemplar(s) and the corresponding label(s) at `index`."""
-    raise NotImplementedError("To be implemented by the subclass.")
+    msg = "To be implemented by the subclass."
+    raise NotImplementedError(msg)
 
   @cached_property
-  def unique_classes(self) -> Sequence[int]:
+  def unique_classes(self: Self) -> Sequence[int]:
     """Deterministic ordering of dataset class labels."""
     return np.unique(self._labels).tolist()
 
   @cached_property
-  def train_classes(self) -> Sequence[int]:
+  def train_classes(self: Self) -> Sequence[int]:
     """Deterministic ordering of training class labels."""
     i = self.num_train_classes
     return self.unique_classes[:i]
 
   @cached_property
-  def valid_classes(self) -> Sequence[int]:
+  def valid_classes(self: Self) -> Sequence[int]:
     """Deterministic ordering of validation class labels."""
     i = self.num_train_classes
     j = self.num_train_classes + self.num_valid_classes
     return self.unique_classes[i:j]
 
   @cached_property
-  def test_classes(self) -> Sequence[int]:
+  def test_classes(self: Self) -> Sequence[int]:
     """Deterministic ordering of testing class labels."""
     j = self.num_train_classes + self.num_valid_classes
     k = self.num_train_classes + self.num_valid_classes + self.num_test_classes
     return self.unique_classes[j:k]
 
   @cached_property
-  def _train_idx(self) -> NDArray[Any, Bool]:
+  def _train_idx(self: Self) -> NDArray[Any, Bool]:
     """Mask for the train split."""
     return np.in1d(self._labels, self.train_classes)
 
   @cached_property
-  def _valid_idx(self) -> NDArray[Any, Bool]:
+  def _valid_idx(self: Self) -> NDArray[Any, Bool]:
     """Mask for the validation split."""
     return np.in1d(self._labels, self.valid_classes)
 
   @cached_property
-  def _test_idx(self) -> NDArray[Any, Bool]:
+  def _test_idx(self: Self) -> NDArray[Any, Bool]:
     """Mask for the test split."""
     return np.in1d(self._labels, self.test_classes)

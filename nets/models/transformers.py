@@ -4,46 +4,38 @@ Adapted from:
   - https://github.com/paganpasta/eqxvision
   - https://github.com/neelnanda-io/TransformerLens
 """
-import numpy as np
+from collections.abc import Callable, Sequence
 from math import prod
+from typing import Self
 
+import equinox as eqx
+import equinox.nn as enn
 import jax
 import jax.nn as jnn
 import jax.numpy as jnp
 import jax.random as jrandom
+import numpy as np
+from jax import Array
 
-import equinox as eqx
-import equinox.nn as enn
-
-from jaxtyping import Array
-from jax.random import KeyArray
-from collections.abc import Callable
-from collections.abc import Sequence
-
-from nets.models.feedforward import MLP
-from nets.models.feedforward import Linear
-from nets.models.feedforward import StopGradient
-from nets.models.feedforward import trunc_normal_init
+from nets.models.feedforward import MLP, Linear, StopGradient, trunc_normal_init
 
 
 class TokenEmbed(eqx.Module):
   """Abstract class for token (example or label) embedding modules."""
-
-  pass
 
 
 class LinearTokenEmbed(enn.Linear, TokenEmbed):
   """Linear token embedding layer."""
 
   def __init__(
-    self,
+    self: Self,
     input_shape: int | Sequence[int],
     embedding_size: int,
     init_stddev: float | None = 1.0,
-    trainable: bool = True,
     *,
-    key: KeyArray,
-  ):
+    trainable: bool = True,
+    key: Array,
+  ) -> None:
     """Initialize a linear token embedding layer."""
     if isinstance(input_shape, int):
       input_shape = (input_shape,)
@@ -70,11 +62,11 @@ class LinearPosEmbed(enn.Embedding, PosEmbed):
   """Simple learned linear positional embedding."""
 
   def __init__(
-    self,
+    self: Self,
     embedding_size: int,
     *,
-    key: KeyArray,
-  ):
+    key: Array,
+  ) -> None:
     """Initialize a linear positional embedding."""
     super().__init__(
       num_embeddings=LinearPosEmbed.MAX_SEQ_LEN,
@@ -82,8 +74,9 @@ class LinearPosEmbed(enn.Embedding, PosEmbed):
       key=key,
     )
 
-  def __call__(self, x: Array, *, key: KeyArray | None = None) -> Array:
+  def __call__(self: Self, x: Array, key: Array) -> Array:
     """Pad sequence to max length for compatibility with the weight matrix."""
+    del key
     pad_size = self.num_embeddings - x.size
     return super().__call__(jnp.pad(x, (0, pad_size), "constant"))
 
@@ -96,12 +89,12 @@ class SinusoidalPosEmbed(enn.Embedding, PosEmbed):
   embedding_size: int = eqx.static_field()
 
   def __init__(
-    self,
+    self: Self,
     embedding_size: int,
     max_time: float = 30.0,
     *,
-    key: KeyArray,
-  ):
+    key: Array,
+  ) -> None:
     """Initialize a sinusoidal positional embedding.
 
     Args:
@@ -111,7 +104,8 @@ class SinusoidalPosEmbed(enn.Embedding, PosEmbed):
         initialisation (keyword-only argument).
     """
     if embedding_size % 2 == 1:
-      raise ValueError("Embedding size must be even if using sinusoidal encoding.")
+      msg = "Embedding size must be even if using sinusoidal encoding."
+      raise ValueError(msg)
 
     # Generate a sequence of positions and frequencies.
     pos = jnp.arange(SinusoidalPosEmbed.MAX_SEQ_LEN, dtype=jnp.float32)
@@ -144,17 +138,17 @@ class AttentionBlock(eqx.Module):
   proj_drop: enn.Dropout
 
   def __init__(
-    self,
+    self: Self,
     dim: int,
     num_heads: int,
-    causal: bool,
-    qkv_bias: bool = False,
     qk_scale: float | None = None,
     attn_drop: float = 0.0,
     proj_drop: float = 0.0,
     *,
-    key: KeyArray,
-  ):
+    causal: bool,
+    qkv_bias: bool = False,
+    key: Array,
+  ) -> None:
     """Initialize an attention block.
 
     Args:
@@ -180,13 +174,16 @@ class AttentionBlock(eqx.Module):
     self.causal = causal
 
     self.qkv = Linear(
-      in_features=dim, out_features=dim * 3, use_bias=qkv_bias, key=keys[0]
+      in_features=dim,
+      out_features=dim * 3,
+      use_bias=qkv_bias,
+      key=keys[0],
     )
     self.attn_drop = enn.Dropout(attn_drop)
     self.proj = Linear(in_features=dim, out_features=dim, key=keys[1])
     self.proj_drop = enn.Dropout(proj_drop)
 
-  def __call__(self, x: Array, *, key: KeyArray) -> Sequence[Array]:
+  def __call__(self: Self, x: Array, key: Array) -> Sequence[Array]:
     """Apply the attention block to the input."""
     n, c = x.shape
     keys = jrandom.split(key, 2)
@@ -222,12 +219,10 @@ class TransformerBlock(eqx.Module):
   drop_path2: enn.Dropout | None
 
   def __init__(
-    self,
+    self: Self,
     dim: int,
     num_heads: int,
-    causal: bool,
     mlp_ratio: float = 4.0,
-    qkv_bias: bool = False,
     qk_scale: float | None = None,
     mlp_drop: float = 4.0,
     attn_drop: float = 0.0,
@@ -236,7 +231,9 @@ class TransformerBlock(eqx.Module):
     act: Callable = jnn.gelu,
     norm_layer: eqx.Module = enn.LayerNorm,
     *,
-    key: KeyArray,
+    causal: bool,
+    qkv_bias: bool = False,
+    key: Array,
   ) -> None:
     """Initialize a transformer block.
 
@@ -274,13 +271,17 @@ class TransformerBlock(eqx.Module):
 
     if mlp_ratio > 0:
       self.norm2 = norm_layer(dim) if norm_layer else enn.Identity()
+
+      hidden_dim = int(dim * mlp_ratio)
       self.mlp = MLP(
         in_features=dim,
-        hidden_features=int(dim * mlp_ratio),
-        act=act,
-        drop=mlp_drop,
+        hidden_features=(hidden_dim, hidden_dim),
+        out_features=dim,
+        activation=act,
+        dropout_probs=(mlp_drop, mlp_drop, mlp_drop),
         key=keys[1],
       )
+
       self.drop_path2 = enn.Dropout(path_drop) if path_drop > 0.0 else enn.Identity()
 
     else:
@@ -288,7 +289,7 @@ class TransformerBlock(eqx.Module):
       self.mlp = None
       self.drop_path2 = None
 
-  def __call__(self, x: Array, *, key: KeyArray) -> Array:
+  def __call__(self: Self, x: Array, key: Array) -> Array:
     """Apply the transformer block to the input."""
     keys = jrandom.split(key, 4)
 
@@ -318,23 +319,21 @@ class Transformer(eqx.Module):
   inference: bool
 
   def __init__(
-    self,
+    self: Self,
     num_classes: int | None,
     embed_dim: int,
     depth: int,
     num_heads: int,
-    causal: bool,
     mlp_ratio: float = 4.0,
-    qkv_bias: bool = True,
     qk_scale: float | None = None,
-    tok_embed_drop_rate: float = 0.0,
-    pos_embed_drop_rate: float = 0.0,
     mlp_drop_rate: float = 0.0,
     attn_drop_rate: float = 0.0,
     path_drop_rate: float = 0.0,
     norm_layer: eqx.Module = enn.LayerNorm,
     *,
-    key: KeyArray,
+    causal: bool,
+    qkv_bias: bool = True,
+    key: Array,
   ) -> None:
     """Initialize a transformer model.
 
@@ -349,8 +348,6 @@ class Transformer(eqx.Module):
       qkv_bias: Whether to use bias a bias term in the query-key-value computation.
       qk_scale: Scalar multiplier for the query-value computation; defaults to
          `1 / sqrt(head_dim)`.
-      tok_embed_drop_rate: Dropout rate used for the token embedding matrix.
-      pos_embed_drop_rate: Dropout rate used for the positional embedding matrix.
       mlp_drop_rate: Dropout rate used within the `MLP`.
       attn_drop_rate: Dropout rate used within the `AttentionBlock`s.
       path_drop_rate: Dropout rate used within `TransformerBlock`s.
@@ -394,12 +391,20 @@ class Transformer(eqx.Module):
       else Linear(in_features=embed_dim, out_features=num_classes, key=keys[depth + 2])
     )
 
-  def __call__(self, x: Array, *, key: KeyArray) -> Array:
+  def __call__(self: Self, x: Array, key: Array) -> Array:
     """Apply the transformer to the input."""
     keys = jrandom.split(key, len(self.blocks))
 
     # `x` should be a sequence of embeddings.
-    assert len(x.shape) == 2 and x.shape[1] == self.embed_dim
+    if len(x.shape) != 2:
+      msg = f"Expected `x` to be a sequence of embeddings, but got {x.shape}."
+      raise ValueError(msg)
+    if x.shape[1] != self.embed_dim:
+      msg = (
+        f"Expected `x` to have embedding dimension {self.embed_dim}, "
+        f"but got {x.shape[1]}."
+      )
+      raise ValueError(msg)
 
     # Residual stream.
     residual = x
@@ -434,10 +439,11 @@ class SequenceClassifier(eqx.Module):
   inference: bool
 
   def __init__(
-    self,
+    self: Self,
     example_shape: tuple[int],
     num_classes: int,
     embed_dim: int,
+    *,
     train_embed: bool = True,
     example_embed_cls: type[TokenEmbed] = LinearTokenEmbed,
     example_embed_drop_rate: float = 0.0,
@@ -445,10 +451,18 @@ class SequenceClassifier(eqx.Module):
     label_embed_drop_rate: float = 0.0,
     pos_embed_cls: type[PosEmbed] = SinusoidalPosEmbed,
     pos_embed_drop_rate: float = 0.0,
-    *,
-    key: KeyArray,
-    **transformer_kwargs,
-  ):
+    transformer_depth: int,
+    transformer_num_heads: int,
+    transformer_mlp_ratio: float = 4.0,
+    transformer_qk_scale: float | None = None,
+    transformer_mlp_drop_rate: float = 0.0,
+    transformer_attn_drop_rate: float = 0.0,
+    transformer_path_drop_rate: float = 0.0,
+    transformer_norm_layer: eqx.Module = enn.LayerNorm,
+    transformer_causal: bool,
+    transformer_qkv_bias: bool = True,
+    key: Array,
+  ) -> None:
     """A model that ingests image-label pairs as a sequence.
 
     Args:
@@ -463,9 +477,20 @@ class SequenceClassifier(eqx.Module):
       label_embed_drop_rate: The dropout probability for label embeddings.
       pos_embed_cls: The positional embedding class.
       pos_embed_drop_rate: The dropout probability for positional embeddings.
+      transformer_depth: Number of `TransformerBlock`s in the network.
+      transformer_num_heads: Number of attention heads within each `AttentionBlock`.
+      transformer_causal: Whether or not to use causal attention.
+      transformer_mlp_ratio: For computing hidden dimension of the `MLP`
+        (=`dim * mlp_ratio`).
+      transformer_qkv_bias: Whether to use bias a bias term in the query-key-value
+        computation.
+      transformer_qk_scale: Scalar multiplier for the query-value computation; defaults
+        to `1 / sqrt(head_dim)`.
+      transformer_mlp_drop_rate: Dropout rate used within the `MLP`.
+      transformer_attn_drop_rate: Dropout rate used within the `AttentionBlock`s.
+      transformer_path_drop_rate: Dropout rate used within `TransformerBlock`s.
+      transformer_norm_layer: Normalisation applied to the intermediate outputs.
       key: A key for randomness in parameter initialization.
-      transformer_kwargs: Remaining keyword arguments to be passed to the wrapped
-        Transformer.
     """
     super().__init__()
     keys = jrandom.split(key, 5)
@@ -504,8 +529,17 @@ class SequenceClassifier(eqx.Module):
     self.transformer = Transformer(
       embed_dim=embed_dim,
       num_classes=None,  # Handle output projection elsewhere.
+      depth=transformer_depth,
+      num_heads=transformer_num_heads,
+      mlp_ratio=transformer_mlp_ratio,
+      qk_scale=transformer_qk_scale,
+      mlp_drop_rate=transformer_mlp_drop_rate,
+      attn_drop_rate=transformer_attn_drop_rate,
+      path_drop_rate=transformer_path_drop_rate,
+      norm_layer=transformer_norm_layer,
+      causal=transformer_causal,
+      qkv_bias=transformer_qkv_bias,
       key=keys[3],
-      **transformer_kwargs,
     )
 
     self.unembed = (
@@ -514,17 +548,20 @@ class SequenceClassifier(eqx.Module):
       else Linear(in_features=embed_dim, out_features=num_classes, key=keys[4])
     )
 
-  def __call__(self, examples: Array, labels: Array, *, key: KeyArray) -> Array:
+  def __call__(self: Self, examples: Array, labels: Array, key: Array) -> Array:
     """Process the sequence of `examples` and `labels`."""
     keys = jrandom.split(key, 3)
 
     num_pairs = examples.shape[0]
-    assert num_pairs == labels.shape[0]
+    if num_pairs != labels.shape[0]:
+      msg = "Expected `examples` and `labels` to have the same length."
+      raise ValueError(msg)
 
     # Example embedding.
-    def deterministic_examplar_dropout(example):
+    def deterministic_examplar_dropout(example: Array) -> Array:
       return self.example_embed_drop(
         example,
+        # Hash example for determinism.
         key=jax.random.fold_in(jax.random.PRNGKey(0), example.sum()),
         inference=False,
       )
@@ -538,16 +575,25 @@ class SequenceClassifier(eqx.Module):
     # Label embedding.
     onehot_labels = jnn.one_hot(labels, self.num_classes)
     label_embedding = self.label_embed_drop(
-      jax.vmap(self.label_embed)(onehot_labels), key=keys[0]
+      jax.vmap(self.label_embed)(onehot_labels),
+      key=keys[0],
     )
 
     # Interleave example and label embeddings, except for the final (query) label.
-    assert example_embedding.dtype == label_embedding.dtype
+    if example_embedding.dtype != label_embedding.dtype:
+      msg = (
+        "Expected `example_embedding` and `label_embedding` to have the same "
+        f"dtype, but got {example_embedding.dtype} and {label_embedding.dtype}."
+      )
+      raise ValueError(msg)
     tok_embedding = jnp.empty(
-      (num_pairs * 2 - 1, self.embed_dim), dtype=example_embedding.dtype
+      (num_pairs * 2 - 1, self.embed_dim),
+      dtype=example_embedding.dtype,
     )
-    tok_embedding = tok_embedding.at[0::2, :].set(example_embedding)
-    tok_embedding = tok_embedding.at[1::2, :].set(label_embedding[:-1, :])
+    tok_embedding = tok_embedding.at[0::2, :].set(example_embedding)  # noqa: PD008
+    tok_embedding = tok_embedding.at[1::2, :].set(  # noqa: PD008
+      label_embedding[:-1, :],
+    )
 
     # Positional embedding.
     seq_len, _ = tok_embedding.shape
@@ -559,6 +605,4 @@ class SequenceClassifier(eqx.Module):
     unembeddings = jax.vmap(self.unembed)(residual)
 
     # Discard labels predicted for labels, i.e., undo interleaving.
-    predictions = unembeddings[0::2, :]
-
-    return predictions
+    return unembeddings[0::2, :]

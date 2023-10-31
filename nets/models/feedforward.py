@@ -1,22 +1,17 @@
 """Simple feedforward neural networks."""
-import numpy as np
+from collections.abc import Callable
 from math import sqrt
-
-import jax
-import jax.numpy as jnp
-import jax.random as jrandom
+from typing import Self
 
 import equinox as eqx
 import equinox.nn as enn
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax import Array
 
-from jaxtyping import Array
-from jax.random import KeyArray
-from collections.abc import Callable
 
-
-def trunc_normal_init(
-  weight: Array, key: KeyArray, stddev: float | None = None
-) -> Array:
+def trunc_normal_init(weight: Array, key: Array, stddev: float | None = None) -> Array:
   """Truncated normal distribution initialization."""
   _, in_ = weight.shape
   stddev = stddev or sqrt(1.0 / max(1.0, in_))
@@ -31,7 +26,7 @@ def trunc_normal_init(
 # Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py.
 def lecun_normal_init(
   weight: Array,
-  key: KeyArray,
+  key: Array,
   scale: float = 1.0,
 ) -> Array:
   """LeCun (variance-scaling) normal distribution initialization."""
@@ -50,9 +45,9 @@ def lecun_normal_init(
 class StopGradient(eqx.Module):
   """Stop gradient wrapper."""
 
-  array: jnp.ndarray
+  array: Array
 
-  def __jax_array__(self):
+  def __jax_array__(self: Self) -> Array:
     """Return the array wrapped with a stop gradient op."""
     return jax.lax.stop_gradient(self.array)
 
@@ -61,15 +56,15 @@ class Linear(enn.Linear):
   """Linear layer."""
 
   def __init__(
-    self,
+    self: Self,
     in_features: int,
     out_features: int,
+    *,
     use_bias: bool = True,
     trainable: bool = True,
-    *,
-    key: KeyArray,
+    key: Array,
     init_scale: float = 1.0,
-  ):
+  ) -> None:
     """Initialize a linear layer."""
     super().__init__(
       in_features=in_features,
@@ -94,63 +89,107 @@ class Linear(enn.Linear):
 class MLP(eqx.Module):
   """Multi-layer perceptron."""
 
-  fc1: eqx.Module
-  act: Callable
-  drop1: enn.Dropout
-  fc2: eqx.Module
-  drop2: enn.Dropout
+  layers: tuple[Linear, ...]
+  dropouts: tuple[enn.Dropout, ...]
+  activation: Callable
+  final_activation: Callable
 
   def __init__(
-    self,
+    self: Self,
     in_features: int,
-    hidden_features: int | None = None,
-    out_features: int | None = None,
-    act: Callable = lambda x: x,
-    drop: float | tuple[float] = 0.0,
+    hidden_features: tuple[int, ...],
+    out_features: int,
+    activation: Callable = jax.nn.relu,
+    final_activation: Callable = lambda x: x,
+    dropout_probs: tuple[float, ...] | None = None,
     *,
-    key: KeyArray = None,
+    use_bias: bool = True,
+    use_final_bias: bool = True,
+    key: Array,
     init_scale: float = 1.0,
-  ):
-    """Initialize an MLP.
-
-    Args:
-       in_features: The expected dimension of the input.
-       hidden_features: Dimensionality of the hidden layer.
-       out_features: The dimension of the output feature.
-       act: Activation function to be applied to the intermediate layers.
-       drop: The probability associated with `Dropout`.
-       key: A `jax.random.PRNGKey` used to provide randomness for parameter
-        initialisation.
-       init_scale: The scale of the variance of the initial weights.
-    """
+  ) -> None:
+    """Initialize an MLP."""
     super().__init__()
-    out_features = out_features or in_features
-    hidden_features = hidden_features or in_features
-    drop_probs = drop if isinstance(drop, tuple) else (drop, drop)
-    keys = jrandom.split(key, 2)
+    self.activation = activation
+    self.final_activation = final_activation
 
-    self.fc1 = Linear(
-      in_features=in_features,
-      out_features=hidden_features,
-      key=keys[0],
-      init_scale=init_scale,
-    )
-    self.act = act
-    self.drop1 = enn.Dropout(drop_probs[0])
-    self.fc2 = Linear(
-      in_features=hidden_features,
-      out_features=out_features,
-      key=keys[1],
-      init_scale=init_scale,
-    )
-    self.drop2 = enn.Dropout(drop_probs[1])
+    # TODO(eringrant): Canonical dropout usage?
+    if dropout_probs is not None:
+      if len(dropout_probs) != len(hidden_features) + 1:
+        msg = (
+          f"Expected {len(hidden_features) + 1} dropout probabilities, "
+          f"got {len(dropout_probs)}."
+        )
+        raise ValueError(
+          msg,
+        )
+    else:
+      dropout_probs = (0.0,) * (len(hidden_features) + 1)
 
-  def __call__(self, x: Array, *, key: KeyArray) -> Array:
-    """Apply the MLP block to the input."""
-    keys = jrandom.split(key, 2)
-    x = self.fc1(x)
-    x = self.act(x)
-    x = self.drop1(x, key=keys[0])
-    x = self.fc2(x)
-    x = self.drop2(x, key=keys[1])
-    return x
+    output_key, *hidden_keys = jax.random.split(key, len(hidden_features) + 1)
+
+    layers = []
+    dropouts = []
+
+    for key, ins, outs, drop in zip(
+      hidden_keys,
+      (in_features,) + hidden_features[:-1],
+      hidden_features,
+      dropout_probs[:-1],
+      strict=True,
+    ):
+      layers.append(
+        Linear(
+          in_features=ins,
+          out_features=outs,
+          use_bias=use_bias,
+          init_scale=init_scale,
+          key=key,
+        ),
+      )
+      dropouts.append(enn.Dropout(drop))
+
+    layers.append(
+      Linear(
+        in_features=hidden_features[-1],
+        out_features=out_features,
+        use_bias=use_final_bias,
+        init_scale=init_scale,
+        key=key,
+      ),
+    )
+    dropouts.append(enn.Dropout(dropout_probs[-1]))
+
+    self.layers = tuple(layers)
+    self.dropouts = tuple(dropouts)
+
+  def __call__(self: Self, x: Array, key: Array) -> Array:
+    """Apply the MLP to an input."""
+    keys = jax.random.split(key, len(self.layers))
+
+    for key, drop, layer in zip(
+      keys[:-1],
+      self.dropouts[:-1],
+      self.layers[:-1],
+      strict=True,
+    ):
+      x = drop(x, key=key)
+      x = layer(x)
+      x = self.activation(x)
+
+    x = self.dropouts[-1](x, key=keys[-1])
+    x = self.layers[-1](x)
+    return self.final_activation(x)
+
+
+if __name__ == "__main__":
+  MLP(
+    in_features=10,
+    out_features=10,
+    hidden_features=(8, 4, 2),
+    activation=jax.nn.relu,
+    final_activation=lambda x: x,
+    use_bias=True,
+    use_final_bias=True,
+    key=jax.random.PRNGKey(0),
+  )(jnp.ones(10), key=jax.random.PRNGKey(0))

@@ -24,18 +24,22 @@ exclude = '''
 target-version = 'py311'
 
 # Rule sets.
-select = [
-  "A", 
-  "B", 
-  "D", 
-  "E", 
-  "F", 
-  "ISC", 
-  "N", 
-  "RUF", 
-  "UP",
+select = ["ALL"]
+ignore = [
+  # Allow `TODO`s.
+  "TD003",
+  "FIX002",
+  # Allow many argument parameters.
+  "PLR0913",
+  # Allow long functions.
+  "PLR0915",
+  # Allow magic values.
+  "PLR2004",
+  # Allow `typing.Any`.
+  "ANN401",
+  # Allow f-strings in `logging`.
+  "G004",
 ]
-ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]

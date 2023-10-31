@@ -1,30 +1,23 @@
 """Launcher for local online stochastic gradient descent runs."""
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
-
-from dataclasses import dataclass
-from dataclasses import field
 
 import jax
 import optax
 
 import nets
-from nets import datasets
-from nets import samplers
-from nets.launch import configs
-from nets.launch import submit
-from nets.launch.hparams import Param
-from nets.launch.hparams import EnumParam
-from nets.launch.hparams import FixedParam
-
-from nets.simulators.online_sgd import simulate_return_df
+from nets import datasets, samplers
+from nets.launch import configs, submit
+from nets.launch.hparams import EnumParam, FixedParam, Param
+from nets.simulators.online_sgd import simulate
 
 
 @dataclass(frozen=True, kw_only=True)
 class SearchConfig(configs.Config):
   """Generic config for a hyperparameter search."""
 
-  seed: Param = field(default_factory=lambda: EnumParam(range(0, 3)))
+  seed: Param = field(default_factory=lambda: EnumParam(range(3)))
 
   # Model params.
   num_hiddens: Param = field(init=False)
@@ -37,7 +30,6 @@ class SearchConfig(configs.Config):
   eval_batch_size: Param = field(default_factory=lambda: FixedParam(32))
   num_epochs: Param = field(default_factory=lambda: FixedParam(1))
   evaluations_per_epoch: Param = field(default_factory=lambda: FixedParam(1))
-  evaluate_on_test_split: Param = field(default_factory=lambda: FixedParam(False))
 
   # Dataset params.
   dataset_cls: Param = field(init=False)
@@ -85,7 +77,7 @@ if __name__ == "__main__":
 
   jobs = submit.submit_jobs(
     executor=executor,
-    func=simulate_return_df,
+    func=simulate,
     cfg=DebugSearchConfig(
       num_epochs=FixedParam(15),
       key=jax.random.PRNGKey(0),
@@ -94,4 +86,3 @@ if __name__ == "__main__":
   )
 
   result = jobs[0].result()
-  print(result)

@@ -1,0 +1,1 @@
+"""Simple stochastic gradient descent."""

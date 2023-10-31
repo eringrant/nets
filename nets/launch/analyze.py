@@ -1,17 +1,14 @@
 """Utilities for analyzing results."""
-import dill as pickle
 import logging
-import os
+from dataclasses import fields
 from pathlib import Path
 
-from dataclasses import fields
+import dill as pickle
 import numpy as np
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 
-from nets.launch import configs
-from nets.launch import hparams
-
+from nets.launch import configs, hparams
 
 # Identifiers that are neither hyperparameters nor metrics.
 ELEMENT_IDENTIFIER_HPARAMS = (
@@ -62,7 +59,7 @@ def postprocess_result(result: pd.DataFrame, cfg: configs.Config) -> pd.DataFram
   categories = {}
   for field in fields(cfg):
     param = getattr(cfg, field.name)
-    if field.name == "key" or field.name == "num_configs":
+    if field.name in {"key", "num_configs"}:
       continue
     if isinstance(param, hparams.EnumParam | hparams.FixedParam):
       categories[field.name] = CategoricalDtype(categories=param, ordered=True)
@@ -71,44 +68,45 @@ def postprocess_result(result: pd.DataFrame, cfg: configs.Config) -> pd.DataFram
   for field_name in categories:
     result[field_name] = result[field_name].astype(categories[field_name])
   result = compress_df(result)
-  if result.isnull().values.any():
-    raise ValueError("Failed to cast.")
+  if result.isna().to_numpy.any():
+    msg = "Failed to cast."
+    raise ValueError(msg)
 
   # Drop constant columns to save memory.
   for col in result.select_dtypes("category"):
     if len(result[col].cat.categories) == 1:
-      result.drop(col, inplace=True, axis=1)
+      result = result.drop(col, axis=1)
 
   return result
 
 
-def truncate(df, col: str, n: int = int(1e2 * 32)):
+def truncate(df: pd.DataFrame, col: str, n: int = int(1e2 * 32)) -> pd.DataFrame:
   """Utility to compress a data frame by truncation."""
   return df[df[col] < n]
 
 
-def load_result_from_pkl(filepath):
+def load_result_from_pkl(filepath: Path) -> pd.DataFrame | None:
   """Load result from `filepath`."""
   if filepath is None:
     return None
-  else:
-    with open(filepath, "rb") as f:
-      _, result = pickle.load(f)
-    if isinstance(result, pd.DataFrame):
-      return result
-    else:
-      logging.info(f"Ignored result from {filepath}:\n{result}")
-      return None
+
+  with Path.open(filepath, "rb") as f:
+    _, result = pickle.load(f)  # noqa: S301
+  if isinstance(result, pd.DataFrame):
+    return result
+
+  logging.info(f"Ignored result from {filepath}:\n{result}")
+  return None
 
 
 def save_result(
-  job_path: str | Path,
+  job_path: Path,
   results: pd.DataFrame,
   result_filename: str = "result",
-) -> str | Path:
+) -> Path:
   """Save `result` at `job_path`."""
   logging.info("Saving results...")
-  results_path = os.path.join(job_path, f"{result_filename}.h5")
+  results_path = Path(job_path, f"{result_filename}.h5")
   results.to_hdf(
     results_path,
     key=f"{result_filename}",
@@ -128,34 +126,44 @@ def save_result(
 import pandas as pd
 df = pd.read_hdf('{results_path}')
 ```
-"""
+""",
   )
   return results_path
 
 
 # TODO(eringrant): Generalize to arbitrary #s.
-def pd_categorical_concat(df1, df2):
+def pd_categorical_concat(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
   """DFs must have common columns."""
   for col1, col2 in zip(
-    df1.select_dtypes("category"), df2.select_dtypes("category"), strict=True
+    df1.select_dtypes("category"),
+    df2.select_dtypes("category"),
+    strict=True,
   ):
-    assert col1 == col2
+    if col1 != col2:
+      msg = f"Columns {col1} and {col2} do not match."
+      raise ValueError(msg)
+
     if df1[col1].cat != df2[col2].cat:
       union_cat = pd.Series(
-        pd.api.types.union_categoricals([df1[col1], df2[col2]], ignore_order=True)
+        pd.api.types.union_categoricals([df1[col1], df2[col2]], ignore_order=True),
       )
 
       df1[col1] = df1[col1].cat.set_categories(union_cat.cat.categories)
       df2[col2] = df2[col2].cat.set_categories(union_cat.cat.categories)
 
-  df = pd.concat((df1, df2))
-  assert all(df[col].dtype == "category" for col in df1.select_dtypes("category"))
+  concat_df = pd.concat((df1, df2))
 
-  return df
+  if not all(
+    concat_df[col].dtype == "category" for col in df1.select_dtypes("category")
+  ):
+    msg = "Failed to concatenate."
+    raise ValueError(msg)
+
+  return concat_df
 
 
 # TODO(eringrant): Generalize to arbitrary #s.
-def read_concat_hdf(f1, f2):
+def read_concat_hdf(f1: Path, f2: Path) -> pd.DataFrame:
   """Read and concatenate two HDFs."""
   ignore_columns = (
     "optimizer_fn",
@@ -170,14 +178,12 @@ def read_concat_hdf(f1, f2):
   df1 = pd.read_hdf(f1, stop=0)
   df2 = pd.read_hdf(f2, stop=0)
 
-  common_columns = set(df1.columns).intersection(df2.columns)
-  common_columns = [
+  common_columns = tuple(set(df1.columns).intersection(df2.columns))
+  common_columns = tuple(
     x for x in df1.columns if x in common_columns and x not in ignore_columns
-  ]
+  )
 
   df1 = pd.read_hdf(f1, columns=common_columns)
   df2 = pd.read_hdf(f2, columns=common_columns)
 
-  df = pd_categorical_concat(df1, df2)
-
-  return df
+  return pd_categorical_concat(df1, df2)
