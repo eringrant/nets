@@ -17,7 +17,7 @@ import jax.random as jrandom
 import numpy as np
 from jax import Array
 
-from nets.models.feedforward import MLP, Linear, StopGradient, trunc_normal_init
+from nets.models.feedforward import MLP, Linear, StopGradient
 
 
 class TokenEmbed(eqx.Module):
@@ -31,7 +31,7 @@ class LinearTokenEmbed(enn.Linear, TokenEmbed):
     self: Self,
     input_shape: int | Sequence[int],
     embedding_size: int,
-    init_stddev: float | None = 1.0,
+    init_scale: float | None = 1.0,
     *,
     trainable: bool = True,
     key: Array,
@@ -39,6 +39,7 @@ class LinearTokenEmbed(enn.Linear, TokenEmbed):
     """Initialize a linear token embedding layer."""
     if isinstance(input_shape, int):
       input_shape = (input_shape,)
+
     super().__init__(
       in_features=prod(input_shape),
       out_features=embedding_size,
@@ -47,7 +48,15 @@ class LinearTokenEmbed(enn.Linear, TokenEmbed):
     )
 
     # Reinitialize weight from truncated normal distribution, reusing `key`.
-    self.weight: Array = trunc_normal_init(self.weight, key=key, stddev=init_stddev)
+    self.weight: Array = jax.nn.initializers.variance_scaling(
+      scale=init_scale,
+      mode="fan_avg",
+      distribution="truncated_normal",
+    )(
+      key=key,
+      shape=self.weight.shape,
+    )
+
     if not trainable:
       self.weight = StopGradient(self.weight)
 
@@ -518,7 +527,7 @@ class SequenceClassifier(eqx.Module):
       embed_dim,
       trainable=train_embed,
       key=keys[1],
-      init_stddev=0.02,
+      init_scale=0.02**2,
     )
     self.label_embed_drop = enn.Dropout(p=label_embed_drop_rate)
 
