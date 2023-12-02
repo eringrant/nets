@@ -108,7 +108,7 @@ class MLP(eqx.Module):
 
     for key, ins, outs, drop in zip(
       hidden_keys,
-      (in_features,) + hidden_features[:-1],
+      (in_features, *tuple(hidden_features[:-1])),
       hidden_features,
       dropout_probs[:-1],
       strict=True,
