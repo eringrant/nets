@@ -234,7 +234,7 @@ def simulate(
   exemplar_noise_scale: float,
   # Sampler params.
   sampler_cls: type[samplers.EpochSampler],  # TODO(eringrant): Use `SingletonSampler`.
-) -> tuple[pd.DataFrame, ...]:
+) -> tuple[eqx.Module, pd.DataFrame]:
   """Simulate in-context learning of classification tasks."""
   logging.info(f"Using JAX backend: {jax.default_backend()}\n")
 

@@ -64,7 +64,7 @@ class Linear(enn.Linear):
 class MLP(eqx.Module):
   """Multi-layer perceptron."""
 
-  layers: tuple[Linear, ...]
+  layers: tuple[enn.Linear, ...]
   dropouts: tuple[enn.Dropout, ...]
   activation: Callable
   final_activation: Callable
